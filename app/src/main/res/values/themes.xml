@@ -1,0 +1,6 @@
+<!-- Theme used only while the app starts, before Compose draws the real screen. -->
+<resources>
+    <style name="Theme.WeightCalendar" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+</resources>

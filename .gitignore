@@ -1,0 +1,13 @@
+# Build outputs and IDE files
+.gradle/
+build/
+local.properties
+.idea/
+.kotlin/
+*.iml
+captures/
+
+# Personal data and reference material, kept out of version control
+/*.png
+/*.ods
+/*.csv
