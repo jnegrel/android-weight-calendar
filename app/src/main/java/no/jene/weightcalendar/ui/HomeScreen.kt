@@ -1,5 +1,8 @@
 package no.jene.weightcalendar.ui
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,15 +16,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
+import no.jene.weightcalendar.data.WeightEntry
 import no.jene.weightcalendar.ui.theme.Background
 import no.jene.weightcalendar.ui.theme.ButtonEnd
 import no.jene.weightcalendar.ui.theme.ButtonStart
@@ -31,14 +46,45 @@ import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.TextSecondary
 import no.jene.weightcalendar.ui.theme.WeightCalendarTheme
+import java.time.LocalDate
 
 // A @Composable function describes a piece of UI. Compose calls it to draw the screen,
 // and calls it again whenever the data it uses changes.
 //
 // Layout of the home screen, top to bottom:
 //   header  |  calendar  |  graph (takes the remaining space)  |  DAILY LOG button
+//
+// HomeScreen connects the screen to its ViewModel (the data); HomeContent only draws.
+// Keeping them apart lets the preview at the bottom draw HomeContent with fake data.
 @Composable
-fun HomeScreen() {
+fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+    val entries by viewModel.entries.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Opens Android's file picker; the chosen file comes back as a Uri (a file reference).
+    val pickCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val message = try {
+                "Imported ${viewModel.importCsv(uri)} days"
+            } catch (e: Exception) {
+                "Import failed: ${e.message}"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    HomeContent(
+        entries = entries,
+        onLog = viewModel::logToday,
+        onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
+    )
+}
+
+@Composable
+private fun HomeContent(entries: List<WeightEntry>, onLog: (Double) -> Unit, onImport: () -> Unit) {
+    var showDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -53,11 +99,29 @@ fun HomeScreen() {
                 .navigationBarsPadding(),        // stay above the Android back/home bar
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Placeholder("Calendar", Modifier.padding(top = 12.dp).height(340.dp))
+            // Temporary (until step 3): a summary of the database instead of the calendar.
+            Placeholder(summary(entries), Modifier.padding(top = 12.dp).height(340.dp)) {
+                TextButton(onClick = onImport) { Text("IMPORT CSV") }
+            }
             Placeholder("Graph", Modifier.weight(1f))
-            DailyLogButton(onClick = { /* step 2: open the weight entry dialog */ })
+            DailyLogButton(onClick = { showDialog = true })
         }
     }
+
+    if (showDialog) {
+        DailyLogDialog(
+            onDismiss = { showDialog = false },
+            onSave = { weight -> onLog(weight); showDialog = false },
+        )
+    }
+}
+
+private fun summary(entries: List<WeightEntry>): String {
+    val last = entries.lastOrNull() ?: return "No data yet"
+    val measured = entries.count { !it.estimated }
+    return "${entries.size} days (${measured} measured)\n" +
+        "from ${entries.first().date} to ${last.date}\n\n" +
+        "Last: ${"%.1f".format(last.weightKg)} kg" + if (last.estimated) " (estimated)" else ""
 }
 
 @Composable
@@ -75,17 +139,19 @@ private fun Header() {
     }
 }
 
-// Grey box standing in for parts we haven't built yet.
+// Grey box standing in for parts we haven't built yet, with optional extra content below the text.
 @Composable
-private fun Placeholder(label: String, modifier: Modifier = Modifier) {
-    Box(
+private fun Placeholder(label: String, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(Surface),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Text(label, color = TextSecondary, fontSize = 18.sp)
+        Text(label, color = TextSecondary, fontSize = 18.sp, textAlign = TextAlign.Center)
+        extra()
     }
 }
 
@@ -110,5 +176,7 @@ private fun DailyLogButton(onClick: () -> Unit) {
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
 private fun HomeScreenPreview() {
-    WeightCalendarTheme { HomeScreen() }
+    val today = LocalDate.now()
+    val fake = (0L..30L).map { WeightEntry(today.minusDays(30 - it), 100.0 - it * 0.1) }
+    WeightCalendarTheme { HomeContent(fake, onLog = {}, onImport = {}) }
 }
