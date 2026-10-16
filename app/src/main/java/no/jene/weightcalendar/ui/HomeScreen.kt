@@ -45,9 +45,7 @@ import no.jene.weightcalendar.ui.theme.ButtonEnd
 import no.jene.weightcalendar.ui.theme.ButtonStart
 import no.jene.weightcalendar.ui.theme.HeaderBottom
 import no.jene.weightcalendar.ui.theme.HeaderTop
-import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
-import no.jene.weightcalendar.ui.theme.TextSecondary
 import no.jene.weightcalendar.ui.theme.WeightCalendarTheme
 import java.time.LocalDate
 
@@ -103,7 +101,7 @@ private fun HomeContent(days: Map<LocalDate, Day>, onLog: (Double) -> Unit, onIm
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             MonthCalendar(days, Modifier.padding(top = 12.dp))
-            Placeholder("Graph", Modifier.weight(1f))
+            WeightGraph(days, Modifier.weight(1f))
             DailyLogButton(onClick = { showDialog = true })
         }
     }
@@ -137,20 +135,6 @@ private fun Header(onImport: () -> Unit) {
                 DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
             }
         }
-    }
-}
-
-// Grey box standing in for parts we haven't built yet.
-@Composable
-private fun Placeholder(label: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Surface),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = TextSecondary, fontSize = 18.sp)
     }
 }
 
