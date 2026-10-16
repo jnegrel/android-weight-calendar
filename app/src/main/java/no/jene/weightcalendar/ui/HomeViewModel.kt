@@ -27,10 +27,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         .map { it.toDays() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    fun logToday(weightKg: Double) {
+    fun setWeight(date: LocalDate, weightKg: Double) {
         // Database work must not block the screen, so it runs in a coroutine
         // (a lightweight background task tied to this ViewModel's lifetime).
-        viewModelScope.launch { repository.logWeight(LocalDate.now(), weightKg) }
+        viewModelScope.launch { repository.setWeight(date, weightKg) }
+    }
+
+    fun delete(date: LocalDate) {
+        viewModelScope.launch { repository.delete(date) }
     }
 
     // Returns the number of imported days, or throws if the file is not valid.
@@ -38,5 +42,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val input = getApplication<Application>().contentResolver.openInputStream(uri)
             ?: error("Cannot open file")
         return input.use { repository.importCsv(it) }
+    }
+
+    // Returns the number of exported days, or throws if the file cannot be written.
+    suspend fun exportCsv(uri: Uri): Int {
+        val output = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
+            ?: error("Cannot write file")
+        return output.use { repository.exportCsv(it) }
     }
 }

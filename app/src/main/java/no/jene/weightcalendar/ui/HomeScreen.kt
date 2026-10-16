@@ -21,9 +21,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,35 +65,50 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Opens Android's file picker; the chosen file comes back as a Uri (a file reference).
-    val pickCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            val message = try {
-                "Imported ${viewModel.importCsv(uri)} days"
-            } catch (e: Exception) {
-                "Import failed: ${e.message}"
-            }
+    // Runs a file operation in the background and shows its outcome in a Toast (short pop-up).
+    fun runFileTask(task: suspend () -> String) {
+        scope.launch {
+            val message = try { task() } catch (e: Exception) { "Failed: ${e.message}" }
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
 
+    // Android's file pickers; the chosen file comes back as a Uri (a file reference),
+    // or null if the user cancelled.
+    val pickCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runFileTask { "Imported ${viewModel.importCsv(uri)} days" }
+    }
+    val createCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) runFileTask { "Exported ${viewModel.exportCsv(uri)} days" }
+    }
+
     HomeContent(
         days = days,
-        onLog = viewModel::logToday,
+        onSave = viewModel::setWeight,
+        onDelete = viewModel::delete,
         onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
+        onExport = { createCsv.launch("weights-${LocalDate.now()}.csv") },  // suggested file name
     )
 }
 
 @Composable
-private fun HomeContent(days: Map<LocalDate, Day>, onLog: (Double) -> Unit, onImport: () -> Unit) {
-    var showDialog by remember { mutableStateOf(false) }
+private fun HomeContent(
+    days: Map<LocalDate, Day>,
+    onSave: (LocalDate, Double) -> Unit,
+    onDelete: (LocalDate) -> Unit,
+    onImport: () -> Unit,
+    onExport: () -> Unit,
+) {
+    // The day being edited in the dialog, or null when the dialog is closed.
+    // (rememberSaveable keeps the dialog open when the phone is rotated.)
+    var editing by rememberSaveable { mutableStateOf<LocalDate?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Background)
     ) {
-        Header(onImport)
+        Header(onImport, onExport)
 
         Column(
             modifier = Modifier
@@ -100,22 +117,29 @@ private fun HomeContent(days: Map<LocalDate, Day>, onLog: (Double) -> Unit, onIm
                 .navigationBarsPadding(),        // stay above the Android back/home bar
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            MonthCalendar(days, Modifier.padding(top = 12.dp))
+            MonthCalendar(days, onEdit = { editing = it }, modifier = Modifier.padding(top = 12.dp))
             WeightGraph(days, Modifier.weight(1f))
-            DailyLogButton(onClick = { showDialog = true })
+            DailyLogButton(onClick = { editing = LocalDate.now() })
         }
     }
 
-    if (showDialog) {
-        DailyLogDialog(
-            onDismiss = { showDialog = false },
-            onSave = { weight -> onLog(weight); showDialog = false },
-        )
+    // "?.let": only show the dialog when a day is being edited.
+    editing?.let { date ->
+        // key(date): start a fresh dialog (with its own text field) for each day.
+        key(date) {
+            DailyLogDialog(
+                date = date,
+                existing = days[date]?.entry,
+                onDismiss = { editing = null },
+                onSave = { weight -> onSave(date, weight); editing = null },
+                onDelete = { onDelete(date); editing = null },
+            )
+        }
     }
 }
 
 @Composable
-private fun Header(onImport: () -> Unit) {
+private fun Header(onImport: () -> Unit, onExport: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
@@ -128,11 +152,12 @@ private fun Header(onImport: () -> Unit) {
     ) {
         Text("Weight Calendar", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Medium)
 
-        // ⋮ menu on the right; more entries (export, settings) will go here later.
+        // ⋮ menu on the right; more entries (settings) will go here later.
         Box(Modifier.align(Alignment.CenterEnd)) {
             TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
+                DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
             }
         }
     }
@@ -164,5 +189,5 @@ private fun HomeScreenPreview() {
     val fake = (0L..60L).map {
         WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
     }
-    WeightCalendarTheme { HomeContent(fake.toDays(), onLog = {}, onImport = {}) }
+    WeightCalendarTheme { HomeContent(fake.toDays(), onSave = { _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
 }

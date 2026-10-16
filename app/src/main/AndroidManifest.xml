@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The manifest tells Android what the app contains: its name, icon and screens ("activities"). -->
+<!-- The manifest tells Android what the app contains: its name, icon and screens ("activities").
+     allowBackup="false": no automatic Google Drive backup; backups are done by CSV export. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.WeightCalendar">

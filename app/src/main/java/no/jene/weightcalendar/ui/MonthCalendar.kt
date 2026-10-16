@@ -58,9 +58,10 @@ fun Trend.color(): Color = when (this) {
 }
 
 // Month view: ‹ OCTOBER 2026 ›, weekday letters, a 6-week grid, and a line with the
-// details of the selected day. Change month with the arrows or by swiping sideways.
+// details of the selected day and an EDIT button. Change month with the arrows or by
+// swiping sideways.
 @Composable
-fun MonthCalendar(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
+fun MonthCalendar(days: Map<LocalDate, Day>, onEdit: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
     val today = LocalDate.now()
     val lastMonth = YearMonth.from(today)
     val firstMonth = days.keys.firstOrNull()?.let(YearMonth::from) ?: lastMonth
@@ -110,7 +111,7 @@ fun MonthCalendar(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
             }
         }
 
-        SelectedDayLine(selected, days[selected])
+        SelectedDayLine(selected, days[selected], onEdit = { onEdit(selected) })
     }
 }
 
@@ -186,9 +187,9 @@ private fun DayCell(
     }
 }
 
-// e.g. "Tuesday 13 October  ·  109.9 kg  ·  -0.1"
+// e.g. "Tuesday 13 October  ·  109.9 kg  ·  -0.1"                 EDIT
 @Composable
-private fun SelectedDayLine(date: LocalDate, day: Day?) {
+private fun SelectedDayLine(date: LocalDate, day: Day?, onEdit: () -> Unit) {
     val text = buildString {
         append(date.format(DateTimeFormatter.ofPattern("EEEE d MMMM")))
         if (day == null) {
@@ -199,11 +200,8 @@ private fun SelectedDayLine(date: LocalDate, day: Day?) {
             if (day.entry.estimated) append("  (estimated)")
         }
     }
-    Text(
-        text,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        textAlign = TextAlign.Center,
-        color = TextSecondary,
-        fontSize = 14.sp,
-    )
+    Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, modifier = Modifier.weight(1f), color = TextSecondary, fontSize = 14.sp)
+        TextButton(onClick = onEdit) { Text(if (day == null) "ADD" else "EDIT", color = AccentBlue) }
+    }
 }
