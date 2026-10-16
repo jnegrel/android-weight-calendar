@@ -24,6 +24,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import no.jene.weightcalendar.data.Day
+import no.jene.weightcalendar.data.SmoothedPoint
+import no.jene.weightcalendar.data.weeklyAverage
+import no.jene.weightcalendar.ui.theme.DailyLine
 import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.TextSecondary
@@ -35,14 +38,17 @@ import kotlin.math.ceil
 
 private const val WINDOW_DAYS = 365L
 
-// Rolling one-year weight graph. Each segment of the line takes the colour of the day
-// it arrives at (same rule as the calendar). Missing days leave a hole in the line.
+// Rolling one-year weight graph: the daily weights as a thin light-grey line, and on top
+// the 7-day average, coloured by its weekly change (see Smoothing.kt).
+// Missing days leave a hole in both lines.
 @Composable
 fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
     val today = LocalDate.now()
     val start = today.minusDays(WINDOW_DAYS)
     // remember(days): only recompute when the data changes, not on every redraw.
     val points = remember(days) { days.values.filter { it.entry.date > start } }
+    // Computed on all days, then cut, so the first points of the year are full 7-day averages.
+    val trend = remember(days) { days.weeklyAverage().filter { it.date > start } }
 
     Column(
         modifier = modifier
@@ -59,7 +65,7 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
         } else {
             val textMeasurer = rememberTextMeasurer()
             Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
-                drawGraph(points, start, textMeasurer)
+                drawGraph(points, trend, start, textMeasurer)
             }
         }
     }
@@ -86,7 +92,9 @@ private fun GraphHeader(points: List<Day>, start: LocalDate, today: LocalDate) {
 
 // Everything below runs inside the Canvas. Coordinates are in pixels, (0,0) = top-left,
 // and y grows downwards, so a heavier weight must get a *smaller* y.
-private fun DrawScope.drawGraph(points: List<Day>, start: LocalDate, textMeasurer: TextMeasurer) {
+private fun DrawScope.drawGraph(
+    points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, textMeasurer: TextMeasurer,
+) {
     val labelStyle = TextStyle(color = TextSecondary, fontSize = 11.sp)
     val left = 34.dp.toPx()                  // room for the kg labels
     val bottom = size.height - 20.dp.toPx()  // room for the month labels
@@ -135,14 +143,26 @@ private fun DrawScope.drawGraph(points: List<Day>, start: LocalDate, textMeasure
         month = month.plusMonths(1)
     }
 
-    // The line itself: one short segment per pair of consecutive days.
+    // Daily weights: thin grey line, one short segment per pair of consecutive days.
     for ((previous, current) in points.zipWithNext()) {
         if (ChronoUnit.DAYS.between(previous.entry.date, current.entry.date) != 1L) continue  // hole
         drawLine(
-            color = current.trend.color(),
+            color = DailyLine,
             start = Offset(x(previous.entry.date), y(previous.entry.weightKg)),
             end = Offset(x(current.entry.date), y(current.entry.weightKg)),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = 1.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+    }
+
+    // 7-day average on top: thicker, each segment coloured by the weekly change.
+    for ((previous, current) in trend.zipWithNext()) {
+        if (ChronoUnit.DAYS.between(previous.date, current.date) != 1L) continue
+        drawLine(
+            color = current.trend.color(),
+            start = Offset(x(previous.date), y(previous.weightKg)),
+            end = Offset(x(current.date), y(current.weightKg)),
+            strokeWidth = 3.dp.toPx(),
             cap = StrokeCap.Round,
         )
     }

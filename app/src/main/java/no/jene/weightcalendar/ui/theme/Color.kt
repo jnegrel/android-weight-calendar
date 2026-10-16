@@ -26,6 +26,9 @@ val GainSmall = Color(0xFFF5C04A)       // 0 < Δ < +0.5     (yellow)
 val GainBig = Color(0xFFF06464)         // Δ ≥ +0.5 kg      (red)
 val Neutral = Color(0xFF6B6B73)         // no previous day to compare with (grey)
 
+// Graph: daily weights, drawn under the coloured 7-day average
+val DailyLine = Color(0x80B4B4BC)       // light grey, 50 % transparent (first byte = opacity)
+
 // Calendar extras
 val Today = Color(0xFF3A6496)           // today, before it is logged (dark blue)
 val EstimatedOutline = Color(0xFFF06464) // ring around interpolated days
