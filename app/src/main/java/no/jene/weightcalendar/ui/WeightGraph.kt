@@ -164,7 +164,7 @@ private fun DrawScope.drawGraph(
             color = DailyLine,
             start = Offset(x(previous.entry.date), y(previous.entry.weightKg)),
             end = Offset(x(current.entry.date), y(current.entry.weightKg)),
-            strokeWidth = 1.5.dp.toPx(),
+            strokeWidth = 1.dp.toPx(),
             cap = StrokeCap.Round,
         )
     }
