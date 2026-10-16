@@ -13,13 +13,40 @@ android {
         applicationId = "no.jene.weightcalendar"
         minSdk = 26          // Android 8.0
         targetSdk = 37       // Android 17
-        versionCode = 1
-        versionName = "0.1"
+        // versionCode must increase with every APK installed on the phone,
+        // otherwise Android refuses the update. versionName is what the user sees.
+        versionCode = 2
+        versionName = "1.0"
+    }
+
+    // Release signing key. The key file and passwords are NOT in the project: they are read
+    // from ~/.gradle/gradle.properties on this machine. Without them, release builds are
+    // simply left unsigned (debug builds always work).
+    val storeFile = providers.gradleProperty("WEIGHTCAL_STORE_FILE").orNull
+    signingConfigs {
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = providers.gradleProperty("WEIGHTCAL_STORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("WEIGHTCAL_KEY_ALIAS").get()
+                keyPassword = providers.gradleProperty("WEIGHTCAL_KEY_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 removes unused code and resources: the APK goes from ~11 MB to ~2 MB.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.findByName("release")
+        }
+        debug {
+            // The debug app gets its own ID, so it installs *next to* the real app instead of
+            // replacing it: testing never touches your real data. Its name is set in
+            // src/debug/res/values/strings.xml.
+            applicationIdSuffix = ".debug"
         }
     }
 

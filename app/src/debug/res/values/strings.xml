@@ -1,0 +1,4 @@
+<!-- Resources in src/debug/ replace the ones in src/main/ for debug builds only. -->
+<resources>
+    <string name="app_name">Weight Cal. (debug)</string>
+</resources>

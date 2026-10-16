@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
@@ -54,19 +55,27 @@ class WeightRepository(private val db: WeightDatabase) {
 
     // Read a CSV file in the format "date,weight_kg,estimated" (header line first)
     // and add or overwrite those days. Returns the number of days imported.
+    // Also accepts what a French/Norwegian spreadsheet may save after editing:
+    // "16/10/2026;109,6;0" (semicolon separator, decimal comma, day/month/year).
     suspend fun importCsv(input: InputStream): Int {
         val rows = input.bufferedReader().useLines { lines ->
             lines.drop(1)                        // skip the header
                 .filter { it.isNotBlank() }
                 .map { line ->
-                    val (date, weight, estimated) = line.split(",").map { it.trim() }
-                    WeightEntry(LocalDate.parse(date), weight.toDouble(), estimated == "1")
+                    val separator = if (';' in line) ';' else ','
+                    val (date, weight, estimated) = line.split(separator).map { it.trim() }
+                    WeightEntry(parseDate(date), weight.replace(',', '.').toDouble(), estimated == "1")
                 }
                 .toList()
         }
         db.withTransaction { dao.upsert(rows) }  // all or nothing, and much faster
         return rows.size
     }
+
+    // "2026-10-16" (standard) or "16/10/2026" (European spreadsheet format).
+    private fun parseDate(text: String): LocalDate =
+        if ('/' in text) LocalDate.parse(text, DateTimeFormatter.ofPattern("d/M/yyyy"))
+        else LocalDate.parse(text)
 
     // Write every day to a CSV file, in the same format as the import.
     // Returns the number of days exported.

@@ -11,3 +11,7 @@ captures/
 /*.png
 /*.ods
 /*.csv
+
+# Signing keys: never in version control
+*.jks
+*.keystore
