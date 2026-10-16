@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.SmoothedPoint
+import no.jene.weightcalendar.data.trendOf
 import no.jene.weightcalendar.data.weeklyAverage
 import no.jene.weightcalendar.ui.theme.DailyLine
 import no.jene.weightcalendar.ui.theme.Surface
@@ -57,7 +58,7 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
             .background(Surface)
             .padding(start = 12.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
     ) {
-        GraphHeader(points, start, today)
+        GraphHeader(points, trend, start, today)
         if (points.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("No data in the last year", color = TextSecondary)
@@ -71,9 +72,10 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
     }
 }
 
-// "Average 108.4 kg"                     "16 Oct 2025 - 16 Oct 2026"
+// "Average                             17 Oct 2025 – 16 Oct 2026
+//  110.3 kg                                   Last 30 days: -0.8 kg"
 @Composable
-private fun GraphHeader(points: List<Day>, start: LocalDate, today: LocalDate) {
+private fun GraphHeader(points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, today: LocalDate) {
     val format = DateTimeFormatter.ofPattern("d MMM yyyy")
     Row(verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
@@ -81,13 +83,25 @@ private fun GraphHeader(points: List<Day>, start: LocalDate, today: LocalDate) {
             val average = points.map { it.entry.weightKg }.average()
             Text(if (points.isEmpty()) "–" else "%.1f kg".format(average), color = TextPrimary, fontSize = 26.sp)
         }
-        Text(
-            "${start.plusDays(1).format(format)} – ${today.format(format)}",
-            color = TextSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 4.dp)) {
+            Text("${start.plusDays(1).format(format)} – ${today.format(format)}", color = TextSecondary, fontSize = 13.sp)
+            monthlyChange(trend)?.let { change ->
+                // Coloured with the weekly rule, using the equivalent change per week.
+                val color = trendOf(change * 7 / MONTH_DAYS).color()
+                Text("Last 30 days: %+.1f kg".format(change), color = color, fontSize = 15.sp)
+            }
+        }
     }
+}
+
+private const val MONTH_DAYS = 30L
+
+// Change of the 7-day average between its latest point and 30 days earlier,
+// or null if there is not enough data.
+private fun monthlyChange(trend: List<SmoothedPoint>): Double? {
+    val last = trend.lastOrNull() ?: return null
+    val monthBefore = trend.find { it.date == last.date.minusDays(MONTH_DAYS) } ?: return null
+    return last.weightKg - monthBefore.weightKg
 }
 
 // Everything below runs inside the Canvas. Coordinates are in pixels, (0,0) = top-left,
@@ -150,7 +164,7 @@ private fun DrawScope.drawGraph(
             color = DailyLine,
             start = Offset(x(previous.entry.date), y(previous.entry.weightKg)),
             end = Offset(x(current.entry.date), y(current.entry.weightKg)),
-            strokeWidth = 1.dp.toPx(),
+            strokeWidth = 1.5.dp.toPx(),
             cap = StrokeCap.Round,
         )
     }
@@ -162,7 +176,7 @@ private fun DrawScope.drawGraph(
             color = current.trend.color(),
             start = Offset(x(previous.date), y(previous.weightKg)),
             end = Offset(x(current.date), y(current.weightKg)),
-            strokeWidth = 3.dp.toPx(),
+            strokeWidth = 2.5.dp.toPx(),
             cap = StrokeCap.Round,
         )
     }
