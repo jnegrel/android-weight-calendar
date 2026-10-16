@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,14 +31,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.WeightEntry
+import no.jene.weightcalendar.data.toDays
 import no.jene.weightcalendar.ui.theme.Background
 import no.jene.weightcalendar.ui.theme.ButtonEnd
 import no.jene.weightcalendar.ui.theme.ButtonStart
@@ -58,7 +61,7 @@ import java.time.LocalDate
 // Keeping them apart lets the preview at the bottom draw HomeContent with fake data.
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
-    val entries by viewModel.entries.collectAsStateWithLifecycle()
+    val days by viewModel.days.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -75,14 +78,14 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     }
 
     HomeContent(
-        entries = entries,
+        days = days,
         onLog = viewModel::logToday,
         onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
     )
 }
 
 @Composable
-private fun HomeContent(entries: List<WeightEntry>, onLog: (Double) -> Unit, onImport: () -> Unit) {
+private fun HomeContent(days: Map<LocalDate, Day>, onLog: (Double) -> Unit, onImport: () -> Unit) {
     var showDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -90,7 +93,7 @@ private fun HomeContent(entries: List<WeightEntry>, onLog: (Double) -> Unit, onI
             .fillMaxSize()
             .background(Background)
     ) {
-        Header()
+        Header(onImport)
 
         Column(
             modifier = Modifier
@@ -99,10 +102,7 @@ private fun HomeContent(entries: List<WeightEntry>, onLog: (Double) -> Unit, onI
                 .navigationBarsPadding(),        // stay above the Android back/home bar
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Temporary (until step 3): a summary of the database instead of the calendar.
-            Placeholder(summary(entries), Modifier.padding(top = 12.dp).height(340.dp)) {
-                TextButton(onClick = onImport) { Text("IMPORT CSV") }
-            }
+            MonthCalendar(days, Modifier.padding(top = 12.dp))
             Placeholder("Graph", Modifier.weight(1f))
             DailyLogButton(onClick = { showDialog = true })
         }
@@ -116,16 +116,9 @@ private fun HomeContent(entries: List<WeightEntry>, onLog: (Double) -> Unit, onI
     }
 }
 
-private fun summary(entries: List<WeightEntry>): String {
-    val last = entries.lastOrNull() ?: return "No data yet"
-    val measured = entries.count { !it.estimated }
-    return "${entries.size} days (${measured} measured)\n" +
-        "from ${entries.first().date} to ${last.date}\n\n" +
-        "Last: ${"%.1f".format(last.weightKg)} kg" + if (last.estimated) " (estimated)" else ""
-}
-
 @Composable
-private fun Header() {
+private fun Header(onImport: () -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -136,22 +129,28 @@ private fun Header() {
         contentAlignment = Alignment.Center,
     ) {
         Text("Weight Calendar", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+
+        // ⋮ menu on the right; more entries (export, settings) will go here later.
+        Box(Modifier.align(Alignment.CenterEnd)) {
+            TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
+            }
+        }
     }
 }
 
-// Grey box standing in for parts we haven't built yet, with optional extra content below the text.
+// Grey box standing in for parts we haven't built yet.
 @Composable
-private fun Placeholder(label: String, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
-    Column(
+private fun Placeholder(label: String, modifier: Modifier = Modifier) {
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(Surface),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = TextSecondary, fontSize = 18.sp, textAlign = TextAlign.Center)
-        extra()
+        Text(label, color = TextSecondary, fontSize = 18.sp)
     }
 }
 
@@ -176,7 +175,10 @@ private fun DailyLogButton(onClick: () -> Unit) {
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
 private fun HomeScreenPreview() {
+    // 60 days of made-up weights, with every 9th day marked as estimated
     val today = LocalDate.now()
-    val fake = (0L..30L).map { WeightEntry(today.minusDays(30 - it), 100.0 - it * 0.1) }
-    WeightCalendarTheme { HomeContent(fake, onLog = {}, onImport = {}) }
+    val fake = (0L..60L).map {
+        WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
+    }
+    WeightCalendarTheme { HomeContent(fake.toDays(), onLog = {}, onImport = {}) }
 }

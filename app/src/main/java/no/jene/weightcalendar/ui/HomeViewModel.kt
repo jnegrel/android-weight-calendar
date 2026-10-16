@@ -5,12 +5,14 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import no.jene.weightcalendar.data.WeightDatabase
-import no.jene.weightcalendar.data.WeightEntry
+import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.WeightRepository
+import no.jene.weightcalendar.data.toDays
 import java.time.LocalDate
 
 // A ViewModel holds the data a screen shows and survives screen rotation
@@ -19,9 +21,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = WeightRepository(WeightDatabase.get(app))
 
-    // All entries, oldest first. The screen observes this and redraws when it changes.
-    val entries: StateFlow<List<WeightEntry>> = repository.entries
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    // All days, oldest first, with their change since the previous day.
+    // The screen observes this and redraws when it changes.
+    val days: StateFlow<Map<LocalDate, Day>> = repository.entries
+        .map { it.toDays() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     fun logToday(weightKg: Double) {
         // Database work must not block the screen, so it runs in a coroutine
