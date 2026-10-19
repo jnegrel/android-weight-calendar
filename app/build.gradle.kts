@@ -15,8 +15,8 @@ android {
         targetSdk = 37       // Android 17
         // versionCode must increase with every APK installed on the phone,
         // otherwise Android refuses the update. versionName is what the user sees.
-        versionCode = 4
-        versionName = "1.2"
+        versionCode = 5
+        versionName = "1.3"
     }
 
     // Release signing key. The key file and passwords are NOT in the project: they are read
