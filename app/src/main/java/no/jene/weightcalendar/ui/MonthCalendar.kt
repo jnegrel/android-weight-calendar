@@ -93,6 +93,14 @@ fun MonthCalendar(
     fun previous() { if (currentMonth > firstMonth) onMonthChange(currentMonth.minusMonths(1)) }
     fun next() { if (currentMonth < lastMonth) onMonthChange(currentMonth.plusMonths(1)) }
 
+    // Tapping a dimmed day of the previous/next month also shows that month
+    // (unless it is before the first month with data).
+    fun select(date: LocalDate) {
+        selected = date
+        val dateMonth = YearMonth.from(date)
+        if (dateMonth != month && dateMonth >= firstMonth) onMonthChange(dateMonth)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -122,7 +130,7 @@ fun MonthCalendar(
                         isToday = date == today,
                         isSelected = date == selected,
                         inMonth = YearMonth.from(date) == month,
-                        onClick = { if (date <= today) selected = date },
+                        onClick = { if (date <= today) select(date) },
                         modifier = Modifier.weight(1f),
                     )
                 }
