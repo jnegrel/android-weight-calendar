@@ -71,6 +71,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // WorkManager: runs background tasks (the daily reminder), even after a reboot.
+    implementation(libs.androidx.work.runtime)
+
     // The BOM ("bill of materials") picks matching versions of all Compose libraries
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

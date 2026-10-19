@@ -1,5 +1,8 @@
 package no.jene.weightcalendar.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -50,6 +54,7 @@ import no.jene.weightcalendar.ui.theme.HeaderTop
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.WeightCalendarTheme
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 
 // A @Composable function describes a piece of UI. Compose calls it to draw the screen,
@@ -64,6 +69,7 @@ import java.time.YearMonth
 fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val days by viewModel.days.collectAsStateWithLifecycle()
     val goal by viewModel.goal.collectAsStateWithLifecycle()
+    val reminder by viewModel.reminder.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -84,8 +90,22 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         if (uri != null) runFileTask { "Exported ${viewModel.exportCsv(uri)} days" }
     }
 
+    // Since Android 13, the user must allow notifications. Asked when the reminder is turned on.
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) Toast.makeText(context, "Notifications blocked: the reminder won't show", Toast.LENGTH_LONG).show()
+    }
+    fun setReminder(enabled: Boolean, time: LocalTime) {
+        viewModel.setReminder(enabled, time)
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        if (enabled && needsPermission) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     HomeContent(
         days = days,
+        reminder = reminder,
+        onReminderChange = ::setReminder,
         goal = goal,
         onGoalChange = viewModel::setGoal,
         onSave = viewModel::setWeight,
@@ -98,6 +118,8 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
 @Composable
 private fun HomeContent(
     days: Map<LocalDate, Day>,
+    reminder: ReminderSetting,
+    onReminderChange: (Boolean, LocalTime) -> Unit,
     goal: Double?,
     onGoalChange: (Double?) -> Unit,
     onSave: (LocalDate, Double) -> Unit,
@@ -109,6 +131,7 @@ private fun HomeContent(
     // (rememberSaveable keeps the dialog open when the phone is rotated.)
     var editing by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     var editingGoal by rememberSaveable { mutableStateOf(false) }
+    var editingReminder by rememberSaveable { mutableStateOf(false) }
     // The month shown in the calendar. It lives here because the graph follows it too.
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     // The graph ends on the last day visible in the calendar grid, but never after the
@@ -120,7 +143,7 @@ private fun HomeContent(
             .fillMaxSize()
             .background(Background)
     ) {
-        Header(onImport, onExport, onGoal = { editingGoal = true })
+        Header(onImport, onExport, onGoal = { editingGoal = true }, onReminder = { editingReminder = true })
 
         Column(
             modifier = Modifier
@@ -134,6 +157,15 @@ private fun HomeContent(
             WeightGraph(days, end = graphEnd, goal = goal, modifier = Modifier.weight(1f))
             DailyLogButton(onClick = { editing = LocalDate.now() })
         }
+    }
+
+    if (editingReminder) {
+        ReminderDialog(
+            enabled = reminder.enabled,
+            time = reminder.time,
+            onDismiss = { editingReminder = false },
+            onSave = { on, time -> onReminderChange(on, time); editingReminder = false },
+        )
     }
 
     if (editingGoal) {
@@ -160,7 +192,7 @@ private fun HomeContent(
 }
 
 @Composable
-private fun Header(onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Unit) {
+private fun Header(onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Unit, onReminder: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
@@ -178,6 +210,7 @@ private fun Header(onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Uni
             TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(text = { Text("Weight goal") }, onClick = { menuOpen = false; onGoal() })
+                DropdownMenuItem(text = { Text("Daily reminder") }, onClick = { menuOpen = false; onReminder() })
                 DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
                 DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
             }
@@ -211,5 +244,5 @@ private fun HomeScreenPreview() {
     val fake = (0L..60L).map {
         WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
     }
-    WeightCalendarTheme { HomeContent(fake.toDays(), goal = 100.0, onGoalChange = {}, onSave = { _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
+    WeightCalendarTheme { HomeContent(fake.toDays(), ReminderSetting(false, LocalTime.of(9, 0)), { _, _ -> }, goal = 100.0, onGoalChange = {}, onSave = { _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
 }

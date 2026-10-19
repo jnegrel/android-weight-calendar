@@ -3,6 +3,10 @@
      allowBackup="false": no automatic Google Drive backup; backups are done by CSV export. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Needed since Android 13 to show notifications (the daily reminder).
+         The user is also asked at run time, when turning the reminder on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
