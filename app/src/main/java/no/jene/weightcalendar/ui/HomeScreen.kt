@@ -4,19 +4,20 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -49,8 +50,6 @@ import no.jene.weightcalendar.data.toDays
 import no.jene.weightcalendar.ui.theme.Background
 import no.jene.weightcalendar.ui.theme.ButtonEnd
 import no.jene.weightcalendar.ui.theme.ButtonStart
-import no.jene.weightcalendar.ui.theme.HeaderBottom
-import no.jene.weightcalendar.ui.theme.HeaderTop
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.WeightCalendarTheme
 import java.time.LocalDate
@@ -118,47 +117,50 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         if (uri != null) runFileTask { "Exported ${viewModel.exportCsv(uri)} days" }
     }
 
-    HomeContent(
-        days = days,
-        reminder = reminder,
-        onReminderChange = ::setReminder,
-        backup = backup,
-        onBackupOpen = viewModel::refreshBackup,
-        onChooseBackupFolder = { pickFolder.launch(null) },
-        onBackupEnabledChange = viewModel::setBackupEnabled,
-        onBackupNow = { runFileTask { "Backup written: ${viewModel.backupNow()}" } },
-        goal = goal,
-        onGoalChange = viewModel::setGoal,
-        onSave = viewModel::setWeight,
-        onDelete = viewModel::delete,
-        onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
-        onExport = { createCsv.launch("weights-${LocalDate.now()}.csv") },  // suggested file name
-    )
+    // Which screen is shown: the home screen, or the settings on top of it.
+    // A single extra screen doesn't need a navigation library: a true/false is enough.
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+
+    if (showSettings) {
+        // Android's back gesture/button closes the settings instead of leaving the app.
+        BackHandler { showSettings = false }
+        SettingsScreen(
+            goal = goal,
+            onGoalChange = viewModel::setGoal,
+            reminder = reminder,
+            onReminderChange = ::setReminder,
+            backup = backup,
+            onChooseBackupFolder = { pickFolder.launch(null) },
+            onBackupEnabledChange = viewModel::setBackupEnabled,
+            onBackupNow = { runFileTask { "Backup written: ${viewModel.backupNow()}" } },
+            onBack = { showSettings = false },
+        )
+    } else {
+        HomeContent(
+            days = days,
+            goal = goal,
+            onSave = viewModel::setWeight,
+            onDelete = viewModel::delete,
+            onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
+            onExport = { createCsv.launch("weights-${LocalDate.now()}.csv") },  // suggested file name
+            onSettings = { viewModel.refreshBackup(); showSettings = true },
+        )
+    }
 }
 
 @Composable
 private fun HomeContent(
     days: Map<LocalDate, Day>,
-    reminder: ReminderSetting,
-    onReminderChange: (Boolean, LocalTime) -> Unit,
-    backup: BackupSetting,
-    onBackupOpen: () -> Unit,
-    onChooseBackupFolder: () -> Unit,
-    onBackupEnabledChange: (Boolean) -> Unit,
-    onBackupNow: () -> Unit,
     goal: Double?,
-    onGoalChange: (Double?) -> Unit,
     onSave: (LocalDate, Double, String?) -> Unit,
     onDelete: (LocalDate) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     // The day being edited in the dialog, or null when the dialog is closed.
     // (rememberSaveable keeps the dialog open when the phone is rotated.)
     var editing by rememberSaveable { mutableStateOf<LocalDate?>(null) }
-    var editingGoal by rememberSaveable { mutableStateOf(false) }
-    var editingReminder by rememberSaveable { mutableStateOf(false) }
-    var editingBackup by rememberSaveable { mutableStateOf(false) }
     // The month shown in the calendar. It lives here because the graph follows it too.
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     // The graph ends on the last day visible in the calendar grid, but never after the
@@ -170,8 +172,7 @@ private fun HomeContent(
             .fillMaxSize()
             .background(Background)
     ) {
-        Header(onImport, onExport, onGoal = { editingGoal = true }, onReminder = { editingReminder = true },
-            onBackup = { onBackupOpen(); editingBackup = true })
+        AppHeader("Weight Calendar") { MainMenu(onImport, onExport, onSettings) }
 
         Column(
             modifier = Modifier
@@ -185,33 +186,6 @@ private fun HomeContent(
             WeightGraph(days, end = graphEnd, goal = goal, modifier = Modifier.weight(1f))
             DailyLogButton(onClick = { editing = LocalDate.now() })
         }
-    }
-
-    if (editingBackup) {
-        BackupDialog(
-            backup = backup,
-            onChooseFolder = onChooseBackupFolder,
-            onEnabledChange = onBackupEnabledChange,
-            onBackupNow = onBackupNow,
-            onDismiss = { editingBackup = false },
-        )
-    }
-
-    if (editingReminder) {
-        ReminderDialog(
-            enabled = reminder.enabled,
-            time = reminder.time,
-            onDismiss = { editingReminder = false },
-            onSave = { on, time -> onReminderChange(on, time); editingReminder = false },
-        )
-    }
-
-    if (editingGoal) {
-        GoalDialog(
-            current = goal,
-            onDismiss = { editingGoal = false },
-            onSave = { onGoalChange(it); editingGoal = false },
-        )
     }
 
     // "?.let": only show the dialog when a day is being edited.
@@ -229,32 +203,16 @@ private fun HomeContent(
     }
 }
 
+// ⋮ menu on the right of the header.
 @Composable
-private fun Header(
-    onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Unit, onReminder: () -> Unit, onBackup: () -> Unit,
-) {
+private fun BoxScope.MainMenu(onImport: () -> Unit, onExport: () -> Unit, onSettings: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-            .background(Brush.verticalGradient(listOf(HeaderTop, HeaderBottom)))
-            .statusBarsPadding()                 // push the title below the clock/battery icons
-            .padding(vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("Weight Calendar", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
-
-        // ⋮ menu on the right; more entries (settings) will go here later.
-        Box(Modifier.align(Alignment.CenterEnd)) {
-            TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(text = { Text("Weight goal") }, onClick = { menuOpen = false; onGoal() })
-                DropdownMenuItem(text = { Text("Daily reminder") }, onClick = { menuOpen = false; onReminder() })
-                DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
-                DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
-                DropdownMenuItem(text = { Text("Daily backup") }, onClick = { menuOpen = false; onBackup() })
-            }
+    Box(Modifier.align(Alignment.CenterEnd)) {
+        TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
+            DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
+            DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; onSettings() })
         }
     }
 }
@@ -285,6 +243,7 @@ private fun HomeScreenPreview() {
     val fake = (0L..60L).map {
         WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
     }
-    WeightCalendarTheme { HomeContent(fake.toDays(), ReminderSetting(false, LocalTime.of(9, 0)), { _, _ -> },
-        BackupSetting(false, null, null), {}, {}, {}, {}, goal = 100.0, onGoalChange = {}, onSave = { _, _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
+    WeightCalendarTheme {
+        HomeContent(fake.toDays(), goal = 100.0, onSave = { _, _, _ -> }, onDelete = {}, onImport = {}, onExport = {}, onSettings = {})
+    }
 }
