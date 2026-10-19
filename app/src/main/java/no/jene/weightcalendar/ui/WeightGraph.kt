@@ -21,8 +21,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
@@ -40,6 +43,7 @@ import no.jene.weightcalendar.data.trendOf
 import no.jene.weightcalendar.data.weeklyAverage
 import no.jene.weightcalendar.ui.theme.AccentBlue
 import no.jene.weightcalendar.ui.theme.DailyLine
+import no.jene.weightcalendar.ui.theme.GoalLine
 import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.TextSecondary
@@ -47,7 +51,9 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.sign
 
 // The periods the graph can show, in the order of the selector under the graph.
 // Like tabs: swiping left goes to the next one (longer period), swiping right to the previous.
@@ -64,7 +70,8 @@ enum class Period(val label: String, val years: Long?) {
 // Missing days leave a hole in both lines.
 @Composable
 // `end` is the last day shown (it follows the month displayed in the calendar).
-fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, modifier: Modifier = Modifier) {
+// `goal` (kg, optional) is drawn as a dashed line, labelled with the estimated date it is reached.
+fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, goal: Double?, modifier: Modifier = Modifier) {
     var period by rememberSaveable { mutableStateOf(Period.ONE_YEAR) }
     // The day before the first one shown (the graph starts just after it).
     val start = when (val years = period.years) {
@@ -106,7 +113,8 @@ fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, modifier: Modifier = 
                 ) { _, dragAmount -> total += dragAmount }
             },
     ) {
-        GraphHeader(points, weekly.filter { it.date <= end }, start, end)
+        val weeklyToEnd = weekly.filter { it.date <= end }
+        GraphHeader(points, weeklyToEnd, start, end)
         if (points.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("No data in this period", color = TextSecondary)
@@ -114,7 +122,10 @@ fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, modifier: Modifier = 
         } else {
             val textMeasurer = rememberTextMeasurer()
             Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
-                drawGraph(grey, smoothed, start, end, textMeasurer)
+                // The estimate only makes sense from the latest data, not from a past month.
+                val isLatest = end == days.keys.lastOrNull()
+                val goalLabel = goal?.let { goalLabel(it, if (isLatest) weeklyToEnd else emptyList()) }
+                drawGraph(grey, smoothed, start, end, goal, goalLabel, textMeasurer)
             }
         }
         PeriodSelector(period, onSelect = { period = it })
@@ -175,11 +186,26 @@ private fun monthlyChange(trend: List<SmoothedPoint>): Double? {
     return last.weightKg - monthBefore.weightKg
 }
 
+// "Goal 100.0 kg · ~Mar 2027": the date when the 7-day average reaches the goal if the
+// change of the last 30 days goes on at the same pace. Without a date when there is no
+// recent trend, or when the weight is moving away from the goal.
+private fun goalLabel(goal: Double, trend: List<SmoothedPoint>): String {
+    val label = "Goal %.1f kg".format(goal)
+    val last = trend.lastOrNull() ?: return label
+    val remaining = goal - last.weightKg
+    if (abs(remaining) < 0.2) return "$label · reached"
+    val perDay = (monthlyChange(trend) ?: return label) / MONTH_DAYS
+    if (perDay == 0.0 || sign(perDay) != sign(remaining)) return label   // wrong way
+    val daysLeft = (remaining / perDay).toLong()
+    if (daysLeft > 5 * 365) return "$label · > 5 years"
+    return "$label · ~" + last.date.plusDays(daysLeft).format(DateTimeFormatter.ofPattern("MMM yyyy"))
+}
+
 // Everything below runs inside the Canvas. Coordinates are in pixels, (0,0) = top-left,
 // and y grows downwards, so a heavier weight must get a *smaller* y.
 private fun DrawScope.drawGraph(
     grey: List<SmoothedPoint>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate,
-    textMeasurer: TextMeasurer,
+    goal: Double?, goalLabel: String?, textMeasurer: TextMeasurer,
 ) {
     val labelStyle = TextStyle(color = TextSecondary, fontSize = 11.sp)
     val left = 34.dp.toPx()                  // room for the kg labels
@@ -254,5 +280,33 @@ private fun DrawScope.drawGraph(
             strokeWidth = 2.5.dp.toPx(),
             cap = StrokeCap.Round,
         )
+    }
+
+    // Weight goal: dashed line with its label above the right end. The range is not widened
+    // for it (a far goal would squash the curves): when it is outside, only the label is
+    // shown at the top or bottom edge, with an arrow.
+    if (goal != null && goalLabel != null) {
+        val inside = goal in low..high
+        val text = when {
+            inside -> goalLabel
+            goal > high -> "↑ $goalLabel"
+            else -> "↓ $goalLabel"
+        }
+        val label = textMeasurer.measure(text, labelStyle.copy(color = GoalLine))
+        val yGoal = y(goal.coerceIn(low, high))
+        if (inside) {
+            val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))
+            drawLine(GoalLine, Offset(left, yGoal), Offset(size.width, yGoal), 1.5.dp.toPx(), pathEffect = dash)
+        }
+        // Above the line, unless that would go off the top of the graph.
+        val labelY = (yGoal - label.size.height - 2.dp.toPx()).let { if (it < 0) yGoal + 2.dp.toPx() else it }
+        val topLeft = Offset(size.width - label.size.width - 4.dp.toPx(), labelY)
+        // A small background so the text stays readable over the curves.
+        drawRoundRect(
+            Surface.copy(alpha = 0.85f), topLeft - Offset(4.dp.toPx(), 0f),
+            Size(label.size.width + 8.dp.toPx(), label.size.height.toFloat()),
+            CornerRadius(4.dp.toPx()),
+        )
+        drawText(label, topLeft = topLeft)
     }
 }

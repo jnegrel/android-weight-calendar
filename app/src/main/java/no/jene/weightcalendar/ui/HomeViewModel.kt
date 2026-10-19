@@ -1,9 +1,12 @@
 package no.jene.weightcalendar.ui
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +23,25 @@ import java.time.LocalDate
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = WeightRepository(WeightDatabase.get(app))
+
+    // Small settings (just the weight goal for now) live in SharedPreferences: a simple
+    // key -> value file kept by Android, better suited than a database table for this.
+    private val settings = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    // The weight goal in kg, or null when none is set. MutableStateFlow = a StateFlow we
+    // can change ourselves; the screen only sees the read-only version.
+    private val _goal = MutableStateFlow(
+        if (settings.contains(GOAL_KEY)) settings.getFloat(GOAL_KEY, 0f).toDouble() else null
+    )
+    val goal: StateFlow<Double?> = _goal
+
+    // null removes the goal.
+    fun setGoal(kg: Double?) {
+        settings.edit {
+            if (kg == null) remove(GOAL_KEY) else putFloat(GOAL_KEY, kg.toFloat())
+        }
+        _goal.value = kg
+    }
 
     // All days, oldest first, with their change since the previous day.
     // The screen observes this and redraws when it changes.
@@ -49,5 +71,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val output = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
             ?: error("Cannot write file")
         return output.use { repository.exportCsv(it) }
+    }
+
+    private companion object {
+        const val GOAL_KEY = "goal_kg"
     }
 }

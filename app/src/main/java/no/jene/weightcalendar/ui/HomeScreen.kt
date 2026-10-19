@@ -63,6 +63,7 @@ import java.time.YearMonth
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val days by viewModel.days.collectAsStateWithLifecycle()
+    val goal by viewModel.goal.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -85,6 +86,8 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
 
     HomeContent(
         days = days,
+        goal = goal,
+        onGoalChange = viewModel::setGoal,
         onSave = viewModel::setWeight,
         onDelete = viewModel::delete,
         onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
@@ -95,6 +98,8 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
 @Composable
 private fun HomeContent(
     days: Map<LocalDate, Day>,
+    goal: Double?,
+    onGoalChange: (Double?) -> Unit,
     onSave: (LocalDate, Double) -> Unit,
     onDelete: (LocalDate) -> Unit,
     onImport: () -> Unit,
@@ -103,6 +108,7 @@ private fun HomeContent(
     // The day being edited in the dialog, or null when the dialog is closed.
     // (rememberSaveable keeps the dialog open when the phone is rotated.)
     var editing by rememberSaveable { mutableStateOf<LocalDate?>(null) }
+    var editingGoal by rememberSaveable { mutableStateOf(false) }
     // The month shown in the calendar. It lives here because the graph follows it too.
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     // The graph ends on the last day visible in the calendar grid, but never after the
@@ -114,7 +120,7 @@ private fun HomeContent(
             .fillMaxSize()
             .background(Background)
     ) {
-        Header(onImport, onExport)
+        Header(onImport, onExport, onGoal = { editingGoal = true })
 
         Column(
             modifier = Modifier
@@ -125,9 +131,17 @@ private fun HomeContent(
         ) {
             MonthCalendar(days, month, onMonthChange = { month = it }, onEdit = { editing = it },
                 modifier = Modifier.padding(top = 12.dp))
-            WeightGraph(days, end = graphEnd, modifier = Modifier.weight(1f))
+            WeightGraph(days, end = graphEnd, goal = goal, modifier = Modifier.weight(1f))
             DailyLogButton(onClick = { editing = LocalDate.now() })
         }
+    }
+
+    if (editingGoal) {
+        GoalDialog(
+            current = goal,
+            onDismiss = { editingGoal = false },
+            onSave = { onGoalChange(it); editingGoal = false },
+        )
     }
 
     // "?.let": only show the dialog when a day is being edited.
@@ -146,7 +160,7 @@ private fun HomeContent(
 }
 
 @Composable
-private fun Header(onImport: () -> Unit, onExport: () -> Unit) {
+private fun Header(onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
@@ -163,6 +177,7 @@ private fun Header(onImport: () -> Unit, onExport: () -> Unit) {
         Box(Modifier.align(Alignment.CenterEnd)) {
             TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(text = { Text("Weight goal") }, onClick = { menuOpen = false; onGoal() })
                 DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
                 DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
             }
@@ -196,5 +211,5 @@ private fun HomeScreenPreview() {
     val fake = (0L..60L).map {
         WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
     }
-    WeightCalendarTheme { HomeContent(fake.toDays(), onSave = { _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
+    WeightCalendarTheme { HomeContent(fake.toDays(), goal = 100.0, onGoalChange = {}, onSave = { _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
 }

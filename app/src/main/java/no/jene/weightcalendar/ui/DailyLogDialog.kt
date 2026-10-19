@@ -70,7 +70,8 @@ fun DailyLogDialog(
 
 // Accepts "82.4" or "82,4" (the phone keyboard may use a comma), rounded to one decimal.
 // Returns null for anything that is not a plausible body weight.
-private fun parseWeight(text: String): Double? =
+// "internal" = visible everywhere in this app (the goal dialog uses it too).
+internal fun parseWeight(text: String): Double? =
     text.replace(',', '.').toDoubleOrNull()
         ?.takeIf { it in 20.0..400.0 }
         ?.let { Math.round(it * 10) / 10.0 }
