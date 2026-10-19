@@ -63,27 +63,28 @@ enum class Period(val label: String, val years: Long?) {
 //   5Y and All: 7-day average in grey (daily weights are an unreadable band), 30-day in colour.
 // Missing days leave a hole in both lines.
 @Composable
-fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
-    val today = LocalDate.now()
+// `end` is the last day shown (it follows the month displayed in the calendar).
+fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, modifier: Modifier = Modifier) {
     var period by rememberSaveable { mutableStateOf(Period.ONE_YEAR) }
     // The day before the first one shown (the graph starts just after it).
     val start = when (val years = period.years) {
-        null -> days.keys.minOrNull()?.minusDays(1) ?: today.minusYears(1)
-        else -> today.minusYears(years)
+        null -> days.keys.minOrNull()?.minusDays(1) ?: end.minusYears(1)
+        else -> end.minusYears(years)
     }
-    // remember(...): only recompute when the data (or the period) changes, not on every redraw.
-    val points = remember(days, start) { days.values.filter { it.entry.date > start } }
+    fun inWindow(date: LocalDate) = date > start && date <= end
+    // remember(...): only recompute when the data (or the window) changes, not on every redraw.
+    val points = remember(days, start, end) { days.values.filter { inWindow(it.entry.date) } }
     // Computed on all days, then cut, so the first points are full averages.
     val weekly = remember(days) { days.weeklyAverage() }
     val monthly = remember(days) { days.monthlyAverage() }
-    val smoothed = remember(weekly, monthly, period, start) {
-        (if (period == Period.ONE_YEAR) weekly else monthly).filter { it.date > start }
+    val smoothed = remember(weekly, monthly, period, start, end) {
+        (if (period == Period.ONE_YEAR) weekly else monthly).filter { inWindow(it.date) }
     }
-    val grey = remember(points, weekly, period, start) {
+    val grey = remember(points, weekly, period, start, end) {
         if (period == Period.ONE_YEAR || period == Period.TWO_YEARS) {
             points.map { SmoothedPoint(it.entry.date, it.entry.weightKg, it.trend) }
         } else {
-            weekly.filter { it.date > start }
+            weekly.filter { inWindow(it.date) }
         }
     }
 
@@ -105,7 +106,7 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
                 ) { _, dragAmount -> total += dragAmount }
             },
     ) {
-        GraphHeader(points, weekly, start, today)
+        GraphHeader(points, weekly.filter { it.date <= end }, start, end)
         if (points.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("No data in this period", color = TextSecondary)
@@ -113,7 +114,7 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
         } else {
             val textMeasurer = rememberTextMeasurer()
             Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
-                drawGraph(grey, smoothed, start, today, textMeasurer)
+                drawGraph(grey, smoothed, start, end, textMeasurer)
             }
         }
         PeriodSelector(period, onSelect = { period = it })
@@ -145,7 +146,7 @@ private fun PeriodSelector(selected: Period, onSelect: (Period) -> Unit) {
 //  110.3 kg                                   Last 30 days: -0.8 kg"
 // The 30-day change always comes from the weekly curve, whatever the period shown.
 @Composable
-private fun GraphHeader(points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, today: LocalDate) {
+private fun GraphHeader(points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate) {
     val format = DateTimeFormatter.ofPattern("d MMM yyyy")
     Row(verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
@@ -154,7 +155,7 @@ private fun GraphHeader(points: List<Day>, trend: List<SmoothedPoint>, start: Lo
             Text(if (points.isEmpty()) "–" else "%.1f kg".format(average), color = TextPrimary, fontSize = 26.sp)
         }
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 4.dp)) {
-            Text("${start.plusDays(1).format(format)} – ${today.format(format)}", color = TextSecondary, fontSize = 13.sp)
+            Text("${start.plusDays(1).format(format)} – ${end.format(format)}", color = TextSecondary, fontSize = 13.sp)
             monthlyChange(trend)?.let { change ->
                 // Coloured with the weekly rule, using the equivalent change per week.
                 val color = trendOf(change * 7 / MONTH_DAYS).color()
@@ -166,7 +167,7 @@ private fun GraphHeader(points: List<Day>, trend: List<SmoothedPoint>, start: Lo
 
 private const val MONTH_DAYS = 30L
 
-// Change of the 7-day average between its latest point and 30 days earlier,
+// Change of the 7-day average between its last point (the graph's end) and 30 days earlier,
 // or null if there is not enough data.
 private fun monthlyChange(trend: List<SmoothedPoint>): Double? {
     val last = trend.lastOrNull() ?: return null

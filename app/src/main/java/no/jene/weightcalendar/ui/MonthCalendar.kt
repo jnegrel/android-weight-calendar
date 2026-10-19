@@ -17,10 +17,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,21 +59,39 @@ fun Trend.color(): Color = when (this) {
     Trend.FIRST -> Neutral
 }
 
+// The 42 days (6 weeks, Monday first) shown for a month: the end of the previous month,
+// the month itself, and the start of the next one.
+fun YearMonth.gridDays(): List<LocalDate> {
+    val first = atDay(1)
+    val gridStart = first.minusDays(first.dayOfWeek.value - 1L)   // the Monday on or before the 1st
+    return (0L until 42L).map { gridStart.plusDays(it) }
+}
+
 // Month view: ‹ OCTOBER 2026 ›, weekday letters, a 6-week grid, and a line with the
 // details of the selected day and an EDIT button. Change month with the arrows or by
 // swiping sideways.
+// The month shown is "hoisted": it lives in the caller (HomeScreen), which also gives it
+// to the graph. The calendar only displays it and asks for changes with onMonthChange.
 @Composable
-fun MonthCalendar(days: Map<LocalDate, Day>, onEdit: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
+fun MonthCalendar(
+    days: Map<LocalDate, Day>,
+    month: YearMonth,
+    onMonthChange: (YearMonth) -> Unit,
+    onEdit: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val today = LocalDate.now()
     val lastMonth = YearMonth.from(today)
     val firstMonth = days.keys.firstOrNull()?.let(YearMonth::from) ?: lastMonth
 
     // rememberSaveable: like remember, but also survives screen rotation.
-    var month by rememberSaveable { mutableStateOf(lastMonth) }
     var selected by rememberSaveable { mutableStateOf(today) }
 
-    fun previous() { if (month > firstMonth) month = month.minusMonths(1) }
-    fun next() { if (month < lastMonth) month = month.plusMonths(1) }
+    // rememberUpdatedState: the swipe detector below is created once, so it must read
+    // the *current* month through this, not the month it saw when it was created.
+    val currentMonth by rememberUpdatedState(month)
+    fun previous() { if (currentMonth > firstMonth) onMonthChange(currentMonth.minusMonths(1)) }
+    fun next() { if (currentMonth < lastMonth) onMonthChange(currentMonth.plusMonths(1)) }
 
     Column(
         modifier = modifier
@@ -92,19 +112,17 @@ fun MonthCalendar(days: Map<LocalDate, Day>, onEdit: (LocalDate) -> Unit, modifi
             onPrevious = ::previous, onNext = ::next)
         WeekdayLetters()
 
-        // Monday-first grid. "offset" = number of empty cells before the 1st of the month.
-        val offset = month.atDay(1).dayOfWeek.value - 1
-        for (week in 0 until 6) {
+        // chunked(7): split the 42 days into 6 rows of 7.
+        for (week in month.gridDays().chunked(7)) {
             Row {
-                for (weekday in 0 until 7) {
-                    val dayNumber = week * 7 + weekday - offset + 1
-                    val date = if (dayNumber in 1..month.lengthOfMonth()) month.atDay(dayNumber) else null
+                for (date in week) {
                     DayCell(
                         date = date,
-                        day = date?.let { days[it] },
+                        day = days[date],
                         isToday = date == today,
                         isSelected = date == selected,
-                        onClick = { if (date != null && date <= today) selected = date },
+                        inMonth = YearMonth.from(date) == month,
+                        onClick = { if (date <= today) selected = date },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -151,14 +169,16 @@ private fun WeekdayLetters() {
 
 // One square of the grid. Layers, from outside in:
 //   red ring (estimated days only)  ->  small gap  ->  coloured rounded square  ->  day number
+// Days of the previous/next month are drawn semi-transparent.
 @Composable
 private fun DayCell(
-    date: LocalDate?, day: Day?, isToday: Boolean, isSelected: Boolean,
+    date: LocalDate, day: Day?, isToday: Boolean, isSelected: Boolean, inMonth: Boolean,
     onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
-    Box(modifier.height(40.dp).padding(2.dp), contentAlignment = Alignment.Center) {
-        if (date == null) return@Box   // empty cell before the 1st / after the last day
-
+    Box(
+        modifier.height(40.dp).padding(2.dp).alpha(if (inMonth) 1f else 0.35f),
+        contentAlignment = Alignment.Center,
+    ) {
         val ring = RoundedCornerShape(12.dp)
         val square = RoundedCornerShape(9.dp)
         val fill = when {

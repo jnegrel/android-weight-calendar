@@ -50,6 +50,7 @@ import no.jene.weightcalendar.ui.theme.HeaderTop
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.WeightCalendarTheme
 import java.time.LocalDate
+import java.time.YearMonth
 
 // A @Composable function describes a piece of UI. Compose calls it to draw the screen,
 // and calls it again whenever the data it uses changes.
@@ -102,6 +103,11 @@ private fun HomeContent(
     // The day being edited in the dialog, or null when the dialog is closed.
     // (rememberSaveable keeps the dialog open when the phone is rotated.)
     var editing by rememberSaveable { mutableStateOf<LocalDate?>(null) }
+    // The month shown in the calendar. It lives here because the graph follows it too.
+    var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
+    // The graph ends on the last day visible in the calendar grid, but never after the
+    // latest logged day (so for the current month it ends on the last entry).
+    val graphEnd = minOf(month.gridDays().last(), days.keys.lastOrNull() ?: LocalDate.now())
 
     Column(
         modifier = Modifier
@@ -117,8 +123,9 @@ private fun HomeContent(
                 .navigationBarsPadding(),        // stay above the Android back/home bar
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            MonthCalendar(days, onEdit = { editing = it }, modifier = Modifier.padding(top = 12.dp))
-            WeightGraph(days, Modifier.weight(1f))
+            MonthCalendar(days, month, onMonthChange = { month = it }, onEdit = { editing = it },
+                modifier = Modifier.padding(top = 12.dp))
+            WeightGraph(days, end = graphEnd, modifier = Modifier.weight(1f))
             DailyLogButton(onClick = { editing = LocalDate.now() })
         }
     }
