@@ -78,6 +78,8 @@ dependencies {
 
     // WorkManager: runs background tasks (the daily reminder), even after a reboot.
     implementation(libs.androidx.work.runtime)
+    // DocumentFile: easy access to a folder chosen with Android's folder picker (daily backup).
+    implementation(libs.androidx.documentfile)
 
     // The BOM ("bill of materials") picks matching versions of all Compose libraries
     implementation(platform(libs.androidx.compose.bom))

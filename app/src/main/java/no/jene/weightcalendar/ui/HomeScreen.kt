@@ -70,6 +70,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val days by viewModel.days.collectAsStateWithLifecycle()
     val goal by viewModel.goal.collectAsStateWithLifecycle()
     val reminder by viewModel.reminder.collectAsStateWithLifecycle()
+    val backup by viewModel.backup.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -79,6 +80,11 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
             val message = try { task() } catch (e: Exception) { "Failed: ${e.message}" }
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
+    }
+
+    // Android's folder picker, for the daily backup.
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) viewModel.setBackupFolder(uri)
     }
 
     // Since Android 13, the user must allow notifications. Asked when the reminder is turned on
@@ -116,6 +122,11 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         days = days,
         reminder = reminder,
         onReminderChange = ::setReminder,
+        backup = backup,
+        onBackupOpen = viewModel::refreshBackup,
+        onChooseBackupFolder = { pickFolder.launch(null) },
+        onBackupEnabledChange = viewModel::setBackupEnabled,
+        onBackupNow = { runFileTask { "Backup written: ${viewModel.backupNow()}" } },
         goal = goal,
         onGoalChange = viewModel::setGoal,
         onSave = viewModel::setWeight,
@@ -130,6 +141,11 @@ private fun HomeContent(
     days: Map<LocalDate, Day>,
     reminder: ReminderSetting,
     onReminderChange: (Boolean, LocalTime) -> Unit,
+    backup: BackupSetting,
+    onBackupOpen: () -> Unit,
+    onChooseBackupFolder: () -> Unit,
+    onBackupEnabledChange: (Boolean) -> Unit,
+    onBackupNow: () -> Unit,
     goal: Double?,
     onGoalChange: (Double?) -> Unit,
     onSave: (LocalDate, Double, String?) -> Unit,
@@ -142,6 +158,7 @@ private fun HomeContent(
     var editing by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     var editingGoal by rememberSaveable { mutableStateOf(false) }
     var editingReminder by rememberSaveable { mutableStateOf(false) }
+    var editingBackup by rememberSaveable { mutableStateOf(false) }
     // The month shown in the calendar. It lives here because the graph follows it too.
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     // The graph ends on the last day visible in the calendar grid, but never after the
@@ -153,7 +170,8 @@ private fun HomeContent(
             .fillMaxSize()
             .background(Background)
     ) {
-        Header(onImport, onExport, onGoal = { editingGoal = true }, onReminder = { editingReminder = true })
+        Header(onImport, onExport, onGoal = { editingGoal = true }, onReminder = { editingReminder = true },
+            onBackup = { onBackupOpen(); editingBackup = true })
 
         Column(
             modifier = Modifier
@@ -167,6 +185,16 @@ private fun HomeContent(
             WeightGraph(days, end = graphEnd, goal = goal, modifier = Modifier.weight(1f))
             DailyLogButton(onClick = { editing = LocalDate.now() })
         }
+    }
+
+    if (editingBackup) {
+        BackupDialog(
+            backup = backup,
+            onChooseFolder = onChooseBackupFolder,
+            onEnabledChange = onBackupEnabledChange,
+            onBackupNow = onBackupNow,
+            onDismiss = { editingBackup = false },
+        )
     }
 
     if (editingReminder) {
@@ -202,7 +230,9 @@ private fun HomeContent(
 }
 
 @Composable
-private fun Header(onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Unit, onReminder: () -> Unit) {
+private fun Header(
+    onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Unit, onReminder: () -> Unit, onBackup: () -> Unit,
+) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
@@ -223,6 +253,7 @@ private fun Header(onImport: () -> Unit, onExport: () -> Unit, onGoal: () -> Uni
                 DropdownMenuItem(text = { Text("Daily reminder") }, onClick = { menuOpen = false; onReminder() })
                 DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
                 DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
+                DropdownMenuItem(text = { Text("Daily backup") }, onClick = { menuOpen = false; onBackup() })
             }
         }
     }
@@ -254,5 +285,6 @@ private fun HomeScreenPreview() {
     val fake = (0L..60L).map {
         WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
     }
-    WeightCalendarTheme { HomeContent(fake.toDays(), ReminderSetting(false, LocalTime.of(9, 0)), { _, _ -> }, goal = 100.0, onGoalChange = {}, onSave = { _, _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
+    WeightCalendarTheme { HomeContent(fake.toDays(), ReminderSetting(false, LocalTime.of(9, 0)), { _, _ -> },
+        BackupSetting(false, null, null), {}, {}, {}, {}, goal = 100.0, onGoalChange = {}, onSave = { _, _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
 }

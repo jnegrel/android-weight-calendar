@@ -2,6 +2,7 @@ package no.jene.weightcalendar.data
 
 import android.content.Context
 import androidx.core.content.edit
+import java.time.LocalDateTime
 import java.time.LocalTime
 
 // Small settings, kept in SharedPreferences: a simple key -> value file managed by Android,
@@ -25,9 +26,26 @@ class Settings(context: Context) {
         get() = LocalTime.ofSecondOfDay(prefs.getInt(REMINDER_TIME, 9 * 3600).toLong())
         set(value) = prefs.edit { putInt(REMINDER_TIME, value.toSecondOfDay()) }
 
+    // Daily backup: on/off, the folder chosen with Android's folder picker (a content:// address,
+    // stored as text), and when the last backup was written.
+    var backupEnabled: Boolean
+        get() = prefs.getBoolean(BACKUP_ON, false)
+        set(value) = prefs.edit { putBoolean(BACKUP_ON, value) }
+
+    var backupFolder: String?
+        get() = prefs.getString(BACKUP_FOLDER, null)
+        set(value) = prefs.edit { putString(BACKUP_FOLDER, value) }
+
+    var lastBackup: LocalDateTime?
+        get() = prefs.getString(LAST_BACKUP, null)?.let(LocalDateTime::parse)
+        set(value) = prefs.edit { putString(LAST_BACKUP, value?.toString()) }
+
     private companion object {
         const val GOAL = "goal_kg"
         const val REMINDER_ON = "reminder_on"
         const val REMINDER_TIME = "reminder_time"   // seconds since midnight
+        const val BACKUP_ON = "backup_on"
+        const val BACKUP_FOLDER = "backup_folder"
+        const val LAST_BACKUP = "last_backup"
     }
 }
