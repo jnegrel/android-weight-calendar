@@ -19,10 +19,10 @@ class WeightRepository(private val db: WeightDatabase) {
 
     val entries = dao.observeAll()
 
-    // Save a measured weight for any day (today or in the past).
+    // Save a measured weight (and optional note) for any day (today or in the past).
     // withTransaction = all the steps happen together, or none if something fails.
-    suspend fun setWeight(date: LocalDate, weightKg: Double) = db.withTransaction {
-        dao.upsert(listOf(WeightEntry(date, weightKg, estimated = false)))
+    suspend fun setWeight(date: LocalDate, weightKg: Double, note: String?) = db.withTransaction {
+        dao.upsert(listOf(WeightEntry(date, weightKg, estimated = false, note = note)))
         refillAround(date)
     }
 
@@ -53,18 +53,28 @@ class WeightRepository(private val db: WeightDatabase) {
         }
     }
 
-    // Read a CSV file in the format "date,weight_kg,estimated" (header line first)
+    // Read a CSV file in the format "date,weight_kg,estimated,note" (header line first)
     // and add or overwrite those days. Returns the number of days imported.
+    // The note column is optional (files from version 1.3 and older don't have it).
     // Also accepts what a French/Norwegian spreadsheet may save after editing:
-    // "16/10/2026;109,6;0" (semicolon separator, decimal comma, day/month/year).
+    // "16/10/2026;109,6;0;..." (semicolon separator, decimal comma, day/month/year).
     suspend fun importCsv(input: InputStream): Int {
         val rows = input.bufferedReader().useLines { lines ->
-            lines.drop(1)                        // skip the header
-                .filter { it.isNotBlank() }
-                .map { line ->
-                    val separator = if (';' in line) ';' else ','
-                    val (date, weight, estimated) = line.split(separator).map { it.trim() }
-                    WeightEntry(parseDate(date), weight.replace(',', '.').toDouble(), estimated == "1")
+            var separator = ','
+            lines.withIndex()
+                .filter { (index, line) ->
+                    // The header decides the separator (a note may contain the other one).
+                    if (index == 0) separator = if (';' in line) ';' else ','
+                    index > 0 && line.isNotBlank()
+                }
+                .map { (_, line) ->
+                    val fields = splitCsvLine(line, separator).map { it.trim() }
+                    WeightEntry(
+                        date = parseDate(fields[0]),
+                        weightKg = fields[1].replace(',', '.').toDouble(),
+                        estimated = fields[2] == "1",
+                        note = fields.getOrNull(3)?.takeIf { it.isNotEmpty() },
+                    )
                 }
                 .toList()
         }
@@ -77,18 +87,44 @@ class WeightRepository(private val db: WeightDatabase) {
         if ('/' in text) LocalDate.parse(text, DateTimeFormatter.ofPattern("d/M/yyyy"))
         else LocalDate.parse(text)
 
+    // Split one CSV line into fields. A field in double quotes may contain the separator,
+    // and "" inside quotes stands for one " (standard CSV, as spreadsheets write it).
+    private fun splitCsvLine(line: String, separator: Char): List<String> {
+        val fields = mutableListOf<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                inQuotes && c == '"' && line.getOrNull(i + 1) == '"' -> { current.append('"'); i++ }
+                c == '"' -> inQuotes = !inQuotes
+                c == separator && !inQuotes -> { fields.add(current.toString()); current.clear() }
+                else -> current.append(c)
+            }
+            i++
+        }
+        fields.add(current.toString())
+        return fields
+    }
+
     // Write every day to a CSV file, in the same format as the import.
     // Returns the number of days exported.
     suspend fun exportCsv(output: OutputStream): Int {
         val rows = dao.getAll()
         output.bufferedWriter().use { out ->
-            out.write("date,weight_kg,estimated\n")
+            out.write("date,weight_kg,estimated,note\n")
             for (e in rows) {
                 // Locale.ROOT forces a dot as decimal separator: on a French phone,
                 // "%.2f" alone would write "110,20" and break the comma-separated format.
-                out.write("${e.date},${"%.2f".format(Locale.ROOT, e.weightKg)},${if (e.estimated) 1 else 0}\n")
+                val weight = "%.2f".format(Locale.ROOT, e.weightKg)
+                out.write("${e.date},$weight,${if (e.estimated) 1 else 0},${csvField(e.note ?: "")}\n")
             }
         }
         return rows.size
     }
+
+    // A note with a comma, semicolon or quote goes in quotes, with " doubled (standard CSV).
+    private fun csvField(text: String): String =
+        if (text.any { it in ",;\"" }) "\"" + text.replace("\"", "\"\"") + "\"" else text
 }

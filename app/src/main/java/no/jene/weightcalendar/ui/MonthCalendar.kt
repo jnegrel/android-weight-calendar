@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,7 +28,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -211,6 +215,13 @@ private fun DayCell(
                 color = TextPrimary,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             )
+            // Small white dot in the corner: this day has a note.
+            if (day?.entry?.note != null) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).padding(3.dp).size(5.dp)
+                        .clip(CircleShape).background(TextPrimary)
+                )
+            }
         }
     }
 }
@@ -229,7 +240,14 @@ private fun SelectedDayLine(date: LocalDate, day: Day?, onEdit: () -> Unit) {
         }
     }
     Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(text, modifier = Modifier.weight(1f), color = TextSecondary, fontSize = 14.sp)
+        Column(Modifier.weight(1f)) {
+            Text(text, color = TextSecondary, fontSize = 14.sp)
+            // The note, if any, on a second line (cut with "…" if too long; EDIT shows it all).
+            day?.entry?.note?.let {
+                Text(it, color = TextPrimary, fontSize = 14.sp, fontStyle = FontStyle.Italic,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
         TextButton(onClick = onEdit) { Text(if (day == null) "ADD" else "EDIT", color = AccentBlue) }
     }
 }

@@ -11,4 +11,5 @@ data class WeightEntry(
     @PrimaryKey val date: LocalDate,   // one entry per day, so the date is the unique key
     val weightKg: Double,
     val estimated: Boolean = false,    // true = filled in by interpolation, not measured
+    val note: String? = null,          // optional free text (added in database version 2)
 )

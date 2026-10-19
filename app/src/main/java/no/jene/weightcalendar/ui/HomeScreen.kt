@@ -122,7 +122,7 @@ private fun HomeContent(
     onReminderChange: (Boolean, LocalTime) -> Unit,
     goal: Double?,
     onGoalChange: (Double?) -> Unit,
-    onSave: (LocalDate, Double) -> Unit,
+    onSave: (LocalDate, Double, String?) -> Unit,
     onDelete: (LocalDate) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
@@ -184,7 +184,7 @@ private fun HomeContent(
                 date = date,
                 existing = days[date]?.entry,
                 onDismiss = { editing = null },
-                onSave = { weight -> onSave(date, weight); editing = null },
+                onSave = { weight, note -> onSave(date, weight, note); editing = null },
                 onDelete = { onDelete(date); editing = null },
             )
         }
@@ -244,5 +244,5 @@ private fun HomeScreenPreview() {
     val fake = (0L..60L).map {
         WeightEntry(today.minusDays(60 - it), 100.0 + 0.8 * kotlin.math.sin(it * 1.3), estimated = it % 9 == 4L)
     }
-    WeightCalendarTheme { HomeContent(fake.toDays(), ReminderSetting(false, LocalTime.of(9, 0)), { _, _ -> }, goal = 100.0, onGoalChange = {}, onSave = { _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
+    WeightCalendarTheme { HomeContent(fake.toDays(), ReminderSetting(false, LocalTime.of(9, 0)), { _, _ -> }, goal = 100.0, onGoalChange = {}, onSave = { _, _, _ -> }, onDelete = {}, onImport = {}, onExport = {}) }
 }

@@ -55,10 +55,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Reminder.schedule(getApplication())   // plan (or cancel) the next reminder
     }
 
-    fun setWeight(date: LocalDate, weightKg: Double) {
+    fun setWeight(date: LocalDate, weightKg: Double, note: String?) {
         // Database work must not block the screen, so it runs in a coroutine
         // (a lightweight background task tied to this ViewModel's lifetime).
-        viewModelScope.launch { repository.setWeight(date, weightKg) }
+        viewModelScope.launch { repository.setWeight(date, weightKg, note) }
         // Today is logged: the reminder (if it was shown) is no longer needed.
         if (date == LocalDate.now()) Reminder.dismissNotification(getApplication())
     }

@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import no.jene.weightcalendar.data.WeightEntry
@@ -21,7 +22,7 @@ import no.jene.weightcalendar.ui.theme.TextSecondary
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-// Pop-up to type, change or delete the weight of one day.
+// Pop-up to type, change or delete the weight of one day, with an optional note.
 // `existing` is the day's current entry, if any: its weight is pre-filled, and a measured
 // entry can be deleted (an estimated one can't: it would just be recalculated).
 @Composable
@@ -29,13 +30,14 @@ fun DailyLogDialog(
     date: LocalDate,
     existing: WeightEntry?,
     onDismiss: () -> Unit,
-    onSave: (Double) -> Unit,
+    onSave: (weight: Double, note: String?) -> Unit,
     onDelete: () -> Unit,
 ) {
     // "remember { mutableStateOf(...) }" = a variable that survives redraws;
     // changing it makes Compose redraw the parts that use it.
     var text by remember { mutableStateOf(existing?.let { "%.1f".format(it.weightKg) } ?: "") }
     val weight = parseWeight(text)
+    var note by remember { mutableStateOf(existing?.note ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -54,10 +56,19 @@ fun DailyLogDialog(
                     isError = text.isNotEmpty() && weight == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
+                OutlinedTextField(
+                    value = note,
+                    // One line (a line break would also break the CSV export), at most 200 characters.
+                    onValueChange = { note = it.replace('\n', ' ').take(200) },
+                    label = { Text("Note (optional)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         },
         confirmButton = {
-            TextButton(onClick = { weight?.let(onSave) }, enabled = weight != null) { Text("SAVE") }
+            TextButton(onClick = { weight?.let { onSave(it, note.trim().ifEmpty { null }) } }, enabled = weight != null) { Text("SAVE") }
         },
         dismissButton = {
             if (existing != null && !existing.estimated) {

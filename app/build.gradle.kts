@@ -60,6 +60,11 @@ android {
     }
 }
 
+// Where Room writes the description of each database version (see WeightDatabase.kt).
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
