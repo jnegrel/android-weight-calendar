@@ -49,16 +49,18 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.ceil
 
-// The periods the graph can show. Swiping right goes further back in time (longer period),
-// like swiping right in the calendar goes to the previous month.
+// The periods the graph can show, in the order of the selector under the graph.
+// Like tabs: swiping left goes to the next one (longer period), swiping right to the previous.
 // `years = null` means everything since the first logged day.
 enum class Period(val label: String, val years: Long?) {
     ONE_YEAR("1Y", 1), TWO_YEARS("2Y", 2), FIVE_YEARS("5Y", 5), ALL("All", null)
 }
 
-// Weight graph over the chosen period: the daily weights as a thin light-grey line, and on
-// top a smoothed curve coloured by its trend (see Smoothing.kt): the 7-day average for one
-// year, the 30-day average for longer periods (a weekly curve over 5 years is just noise).
+// Weight graph over the chosen period: a thin light-grey line for the details, and on top
+// a smoothed curve coloured by its trend (see Smoothing.kt).
+//   1Y: daily weights in grey, 7-day average in colour.
+//   2Y: daily weights in grey, 30-day average in colour.
+//   5Y and All: 7-day average in grey (daily weights are an unreadable band), 30-day in colour.
 // Missing days leave a hole in both lines.
 @Composable
 fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
@@ -77,9 +79,16 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
     val smoothed = remember(weekly, monthly, period, start) {
         (if (period == Period.ONE_YEAR) weekly else monthly).filter { it.date > start }
     }
+    val grey = remember(points, weekly, period, start) {
+        if (period == Period.ONE_YEAR || period == Period.TWO_YEARS) {
+            points.map { SmoothedPoint(it.entry.date, it.entry.weightKg, it.trend) }
+        } else {
+            weekly.filter { it.date > start }
+        }
+    }
 
-    fun longer() { period = Period.entries.getOrElse(period.ordinal + 1) { period } }
-    fun shorter() { period = Period.entries.getOrElse(period.ordinal - 1) { period } }
+    fun next() { period = Period.entries.getOrElse(period.ordinal + 1) { period } }
+    fun previous() { period = Period.entries.getOrElse(period.ordinal - 1) { period } }
 
     Column(
         modifier = modifier
@@ -92,7 +101,7 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
                 var total = 0f
                 detectHorizontalDragGestures(
                     onDragStart = { total = 0f },
-                    onDragEnd = { if (total > 100) longer() else if (total < -100) shorter() },
+                    onDragEnd = { if (total > 100) previous() else if (total < -100) next() },
                 ) { _, dragAmount -> total += dragAmount }
             },
     ) {
@@ -104,19 +113,18 @@ fun WeightGraph(days: Map<LocalDate, Day>, modifier: Modifier = Modifier) {
         } else {
             val textMeasurer = rememberTextMeasurer()
             Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
-                drawGraph(points, smoothed, start, today, textMeasurer)
+                drawGraph(grey, smoothed, start, today, textMeasurer)
             }
         }
         PeriodSelector(period, onSelect = { period = it })
     }
 }
 
-// "All  5Y  2Y  1Y" under the graph: shows where you are, and can also be tapped.
-// Longest on the left, like the time axis (past on the left, today on the right).
+// "1Y  2Y  5Y  All" under the graph: shows where you are, and can also be tapped.
 @Composable
 private fun PeriodSelector(selected: Period, onSelect: (Period) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-        for (p in Period.entries.reversed()) {
+        for (p in Period.entries) {
             val isSelected = p == selected
             Text(
                 p.label,
@@ -169,7 +177,7 @@ private fun monthlyChange(trend: List<SmoothedPoint>): Double? {
 // Everything below runs inside the Canvas. Coordinates are in pixels, (0,0) = top-left,
 // and y grows downwards, so a heavier weight must get a *smaller* y.
 private fun DrawScope.drawGraph(
-    points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate,
+    grey: List<SmoothedPoint>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate,
     textMeasurer: TextMeasurer,
 ) {
     val labelStyle = TextStyle(color = TextSecondary, fontSize = 11.sp)
@@ -177,8 +185,8 @@ private fun DrawScope.drawGraph(
     val bottom = size.height - 20.dp.toPx()  // room for the month labels
     val width = size.width - left
 
-    // Vertical range: lowest - 2 kg to highest + 2 kg, widened to at least 5 kg.
-    val weights = points.map { it.entry.weightKg }
+    // Vertical range: lowest - 2 kg to highest + 2 kg of the grey line, widened to at least 5 kg.
+    val weights = grey.map { it.weightKg }
     var low = weights.min() - 2
     var high = weights.max() + 2
     if (high - low < 5) {
@@ -223,13 +231,13 @@ private fun DrawScope.drawGraph(
         month = month.plusMonths(1)
     }
 
-    // Daily weights: thin grey line, one short segment per pair of consecutive days.
-    for ((previous, current) in points.zipWithNext()) {
-        if (ChronoUnit.DAYS.between(previous.entry.date, current.entry.date) != 1L) continue  // hole
+    // Thin grey line, one short segment per pair of consecutive days.
+    for ((previous, current) in grey.zipWithNext()) {
+        if (ChronoUnit.DAYS.between(previous.date, current.date) != 1L) continue  // hole
         drawLine(
             color = DailyLine,
-            start = Offset(x(previous.entry.date), y(previous.entry.weightKg)),
-            end = Offset(x(current.entry.date), y(current.entry.weightKg)),
+            start = Offset(x(previous.date), y(previous.weightKg)),
+            end = Offset(x(current.date), y(current.weightKg)),
             strokeWidth = 1.dp.toPx(),
             cap = StrokeCap.Round,
         )
