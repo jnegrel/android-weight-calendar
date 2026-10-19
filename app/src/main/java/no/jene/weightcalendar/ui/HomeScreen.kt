@@ -81,25 +81,35 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         }
     }
 
-    // Android's file pickers; the chosen file comes back as a Uri (a file reference),
-    // or null if the user cancelled.
-    val pickCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) runFileTask { "Imported ${viewModel.importCsv(uri)} days" }
-    }
-    val createCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) runFileTask { "Exported ${viewModel.exportCsv(uri)} days" }
-    }
-
-    // Since Android 13, the user must allow notifications. Asked when the reminder is turned on.
+    // Since Android 13, the user must allow notifications. Asked when the reminder is turned on
+    // (in its dialog, or by importing a backup where it is on).
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) Toast.makeText(context, "Notifications blocked: the reminder won't show", Toast.LENGTH_LONG).show()
     }
-    fun setReminder(enabled: Boolean, time: LocalTime) {
-        viewModel.setReminder(enabled, time)
+    fun askNotificationsIfNeeded() {
         val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
-        if (enabled && needsPermission) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (viewModel.reminder.value.enabled && needsPermission) {
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    fun setReminder(enabled: Boolean, time: LocalTime) {
+        viewModel.setReminder(enabled, time)
+        askNotificationsIfNeeded()
+    }
+
+    // Android's file pickers; the chosen file comes back as a Uri (a file reference),
+    // or null if the user cancelled.
+    val pickCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runFileTask {
+            val count = viewModel.importCsv(uri)
+            askNotificationsIfNeeded()
+            "Imported $count days"
+        }
+    }
+    val createCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) runFileTask { "Exported ${viewModel.exportCsv(uri)} days" }
     }
 
     HomeContent(

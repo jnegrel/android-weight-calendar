@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -56,30 +57,53 @@ class WeightRepository(private val db: WeightDatabase) {
     // Read a CSV file in the format "date,weight_kg,estimated,note" (header line first)
     // and add or overwrite those days. Returns the number of days imported.
     // The note column is optional (files from version 1.3 and older don't have it).
+    // Lines starting with # before the header are settings (see exportCsv); they are
+    // applied only if all the days could be read. Older files have none: settings unchanged.
     // Also accepts what a French/Norwegian spreadsheet may save after editing:
     // "16/10/2026;109,6;0;..." (semicolon separator, decimal comma, day/month/year).
-    suspend fun importCsv(input: InputStream): Int {
-        val rows = input.bufferedReader().useLines { lines ->
-            var separator = ','
-            lines.withIndex()
-                .filter { (index, line) ->
+    suspend fun importCsv(input: InputStream, settings: Settings): Int {
+        val rows = mutableListOf<WeightEntry>()
+        val settingLines = mutableListOf<String>()
+        var separator: Char? = null   // decided by the header line
+        input.bufferedReader().useLines { lines ->
+            for (line in lines) {
+                val sep = separator
+                when {
+                    line.isBlank() -> {}
+                    line.startsWith("#") -> settingLines.add(line)
                     // The header decides the separator (a note may contain the other one).
-                    if (index == 0) separator = if (';' in line) ';' else ','
-                    index > 0 && line.isNotBlank()
+                    sep == null -> separator = if (';' in line) ';' else ','
+                    else -> rows.add(parseRow(line, sep))
                 }
-                .map { (_, line) ->
-                    val fields = splitCsvLine(line, separator).map { it.trim() }
-                    WeightEntry(
-                        date = parseDate(fields[0]),
-                        weightKg = fields[1].replace(',', '.').toDouble(),
-                        estimated = fields[2] == "1",
-                        note = fields.getOrNull(3)?.takeIf { it.isNotEmpty() },
-                    )
-                }
-                .toList()
+            }
         }
         db.withTransaction { dao.upsert(rows) }  // all or nothing, and much faster
+        settingLines.forEach { applySetting(it, settings) }
         return rows.size
+    }
+
+    private fun parseRow(line: String, separator: Char): WeightEntry {
+        val fields = splitCsvLine(line, separator).map { it.trim() }
+        return WeightEntry(
+            date = parseDate(fields[0]),
+            weightKg = fields[1].replace(',', '.').toDouble(),
+            estimated = fields[2] == "1",
+            note = fields.getOrNull(3)?.takeIf { it.isNotEmpty() },
+        )
+    }
+
+    // "# goal_kg=100.0" -> settings.goalKg = 100.0. Unknown keys and bad values are ignored.
+    // A spreadsheet may add empty cells (";;;") at the end, or write "100,0": both are fine.
+    private fun applySetting(line: String, settings: Settings) {
+        val parts = line.removePrefix("#").split('=', limit = 2)
+        if (parts.size != 2) return
+        val key = parts[0].trim()
+        val value = parts[1].trim().trimEnd(',', ';').trim()
+        when (key) {
+            "goal_kg" -> settings.goalKg = value.replace(',', '.').toDoubleOrNull()   // empty = no goal
+            "reminder_on" -> settings.reminderEnabled = value == "1"
+            "reminder_time" -> runCatching { LocalTime.parse(value) }.onSuccess { settings.reminderTime = it }
+        }
     }
 
     // "2026-10-16" (standard) or "16/10/2026" (European spreadsheet format).
@@ -108,11 +132,21 @@ class WeightRepository(private val db: WeightDatabase) {
         return fields
     }
 
-    // Write every day to a CSV file, in the same format as the import.
+    // Write the settings, then every day, to a CSV file, in the same format as the import:
+    //   # Weight Calendar backup. Lines starting with # are settings.
+    //   # goal_kg=100.0
+    //   # reminder_on=1
+    //   # reminder_time=09:00
+    //   date,weight_kg,estimated,note
+    //   2026-10-12,110.00,0,"Restaurant, pizza"
     // Returns the number of days exported.
-    suspend fun exportCsv(output: OutputStream): Int {
+    suspend fun exportCsv(output: OutputStream, settings: Settings): Int {
         val rows = dao.getAll()
         output.bufferedWriter().use { out ->
+            out.write("# Weight Calendar backup. Lines starting with # are settings.\n")
+            out.write("# goal_kg=${settings.goalKg?.let { "%.1f".format(Locale.ROOT, it) } ?: ""}\n")
+            out.write("# reminder_on=${if (settings.reminderEnabled) 1 else 0}\n")
+            out.write("# reminder_time=${settings.reminderTime}\n")
             out.write("date,weight_kg,estimated,note\n")
             for (e in rows) {
                 // Locale.ROOT forces a dot as decimal separator: on a French phone,

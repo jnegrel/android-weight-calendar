@@ -68,17 +68,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // Returns the number of imported days, or throws if the file is not valid.
+    // The file may also contain settings: the screen is updated and the reminder replanned.
     suspend fun importCsv(uri: Uri): Int {
         val input = getApplication<Application>().contentResolver.openInputStream(uri)
             ?: error("Cannot open file")
-        return input.use { repository.importCsv(it) }
+        val count = input.use { repository.importCsv(it, settings) }
+        _goal.value = settings.goalKg
+        _reminder.value = ReminderSetting(settings.reminderEnabled, settings.reminderTime)
+        Reminder.schedule(getApplication())
+        return count
     }
 
     // Returns the number of exported days, or throws if the file cannot be written.
     suspend fun exportCsv(uri: Uri): Int {
         val output = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
             ?: error("Cannot write file")
-        return output.use { repository.exportCsv(it) }
+        return output.use { repository.exportCsv(it, settings) }
     }
 }
 
