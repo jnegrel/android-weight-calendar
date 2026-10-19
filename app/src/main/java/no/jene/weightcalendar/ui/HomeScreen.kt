@@ -144,13 +144,13 @@ private fun Header(onImport: () -> Unit, onExport: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+            .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
             .background(Brush.verticalGradient(listOf(HeaderTop, HeaderBottom)))
             .statusBarsPadding()                 // push the title below the clock/battery icons
-            .padding(vertical = 20.dp),
+            .padding(vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("Weight Calendar", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+        Text("Weight Calendar", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
 
         // ⋮ menu on the right; more entries (settings) will go here later.
         Box(Modifier.align(Alignment.CenterEnd)) {
@@ -170,7 +170,7 @@ private fun DailyLogButton(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 16.dp)
-            .height(60.dp)
+            .height(45.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Brush.horizontalGradient(listOf(ButtonStart, ButtonEnd)))
             .clickable(onClick = onClick),

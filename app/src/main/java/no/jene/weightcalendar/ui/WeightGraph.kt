@@ -192,12 +192,9 @@ private fun DrawScope.drawGraph(
     fun x(date: LocalDate) = left + width * ChronoUnit.DAYS.between(start, date) / windowDays
     fun y(kg: Double) = (bottom * (high - kg) / (high - low)).toFloat()
 
-    // Horizontal grid lines with kg labels, every 1, 2 or 5 kg depending on the range.
-    val step = when {
-        high - low <= 8 -> 1
-        high - low <= 20 -> 2
-        else -> 5
-    }
+    // Horizontal grid lines with kg labels: the smallest step (1, 2, 5 or 10 kg) that keeps
+    // the labels at least 20 dp apart, so they stay readable however small the graph is.
+    val step = listOf(1, 2, 5, 10).firstOrNull { y(low) - y(low + it) >= 20.dp.toPx() } ?: 20
     var kg = ceil(low / step) * step
     while (kg <= high) {
         val yPos = y(kg)

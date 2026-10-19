@@ -156,7 +156,7 @@ private fun DayCell(
     date: LocalDate?, day: Day?, isToday: Boolean, isSelected: Boolean,
     onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
-    Box(modifier.height(46.dp).padding(2.dp), contentAlignment = Alignment.Center) {
+    Box(modifier.height(40.dp).padding(2.dp), contentAlignment = Alignment.Center) {
         if (date == null) return@Box   // empty cell before the 1st / after the last day
 
         val ring = RoundedCornerShape(12.dp)
