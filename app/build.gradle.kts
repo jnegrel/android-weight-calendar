@@ -17,6 +17,9 @@ android {
         // otherwise Android refuses the update. versionName is what the user sees.
         versionCode = 7
         versionName = "1.5"
+
+        // Runs the tests of app/src/androidTest on a device or emulator.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // Release signing key. The key file and passwords are NOT in the project: they are read
@@ -87,4 +90,11 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Tests. app/src/test: run on the computer (./gradlew testDebugUnitTest).
+    // app/src/androidTest: run on the emulator (./gradlew connectedDebugAndroidTest).
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
