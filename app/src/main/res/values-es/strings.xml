@@ -46,6 +46,7 @@
     <string name="unit_lb">Libras (lb)</string>
     <string name="language_title">Idioma</string>
     <string name="about_title">Acerca de</string>
+    <string name="source_code">Código fuente</string>
     <string name="average">Media</string>
     <string name="last_30_days">Últimos 30 días: %1$s</string>
     <string name="no_data_period">Sin datos en este periodo</string>

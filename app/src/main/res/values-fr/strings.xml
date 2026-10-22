@@ -46,6 +46,7 @@
     <string name="unit_lb">Livres (lb)</string>
     <string name="language_title">Langue</string>
     <string name="about_title">À propos</string>
+    <string name="source_code">Code source</string>
     <string name="average">Moyenne</string>
     <string name="last_30_days">30 derniers jours : %1$s</string>
     <string name="no_data_period">Aucune donnée sur cette période</string>

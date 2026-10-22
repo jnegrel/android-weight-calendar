@@ -102,6 +102,12 @@ fun SettingsScreen(
             }
             SettingsCard(Modifier.padding(top = 16.dp)) {
                 SettingRow(stringResource(R.string.about_title), "${stringResource(R.string.app_name)} $version", onClick = null)
+                HorizontalDivider(color = Background)
+                // Opens the project page in the browser: an Intent with ACTION_VIEW and a web
+                // address asks Android to show it with the app that handles web links.
+                SettingRow(stringResource(R.string.source_code), "GitHub · GPL-3.0") {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)))
+                }
             }
         }
     }
@@ -161,6 +167,8 @@ private fun UnitDialog(current: WeightUnit, onDismiss: () -> Unit, onSelect: (We
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
+
+private const val SOURCE_URL = "https://github.com/jnegrel/android-weight-calendar"
 
 // "Français", "Norsk bokmål"...: the language the app is shown in, in that language.
 private fun currentLanguage(): String {

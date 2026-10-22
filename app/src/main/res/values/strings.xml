@@ -49,6 +49,7 @@
     <string name="unit_lb">Pounds (lb)</string>
     <string name="language_title">Language</string>
     <string name="about_title">About</string>
+    <string name="source_code">Source code</string>
     <string name="average">Average</string>
     <string name="last_30_days">Last 30 days: %1$s</string>
     <string name="no_data_period">No data in this period</string>

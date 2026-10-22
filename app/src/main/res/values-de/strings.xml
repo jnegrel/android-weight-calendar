@@ -46,6 +46,7 @@
     <string name="unit_lb">Pfund (lb)</string>
     <string name="language_title">Sprache</string>
     <string name="about_title">Über</string>
+    <string name="source_code">Quellcode</string>
     <string name="average">Durchschnitt</string>
     <string name="last_30_days">Letzte 30 Tage: %1$s</string>
     <string name="no_data_period">Keine Daten in diesem Zeitraum</string>

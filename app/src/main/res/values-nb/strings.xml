@@ -46,6 +46,7 @@
     <string name="unit_lb">Pund (lb)</string>
     <string name="language_title">Språk</string>
     <string name="about_title">Om</string>
+    <string name="source_code">Kildekode</string>
     <string name="average">Snitt</string>
     <string name="last_30_days">Siste 30 dager: %1$s</string>
     <string name="no_data_period">Ingen data i denne perioden</string>
