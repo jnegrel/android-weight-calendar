@@ -229,13 +229,14 @@ private fun DayCell(
 // e.g. "Tuesday 13 October  ·  109.9 kg  ·  -0.1"                 EDIT
 @Composable
 private fun SelectedDayLine(date: LocalDate, day: Day?, onEdit: () -> Unit) {
+    val unit = LocalWeightUnit.current
     val text = buildString {
         append(date.format(DateTimeFormatter.ofPattern("EEEE d MMMM")))
         if (day == null) {
             append("  ·  no entry")
         } else {
-            append("  ·  %.1f kg".format(day.entry.weightKg))
-            day.delta?.let { append("  ·  %+.1f".format(it)) }
+            append("  ·  " + unit.format(day.entry.weightKg))
+            day.delta?.let { append("  ·  %+.1f".format(unit.fromKg(it))) }
             if (day.entry.estimated) append("  (estimated)")
         }
     }

@@ -26,6 +26,11 @@ class Settings(context: Context) {
         get() = LocalTime.ofSecondOfDay(prefs.getInt(REMINDER_TIME, 9 * 3600).toLong())
         set(value) = prefs.edit { putInt(REMINDER_TIME, value.toSecondOfDay()) }
 
+    // Unit used to show and type weights (the data itself is always in kg).
+    var unit: WeightUnit
+        get() = runCatching { WeightUnit.valueOf(prefs.getString(UNIT, null) ?: "KG") }.getOrDefault(WeightUnit.KG)
+        set(value) = prefs.edit { putString(UNIT, value.name) }
+
     // Daily backup: on/off, the folder chosen with Android's folder picker (a content:// address,
     // stored as text), and when the last backup was written.
     var backupEnabled: Boolean
@@ -44,6 +49,7 @@ class Settings(context: Context) {
         const val GOAL = "goal_kg"
         const val REMINDER_ON = "reminder_on"
         const val REMINDER_TIME = "reminder_time"   // seconds since midnight
+        const val UNIT = "unit"
         const val BACKUP_ON = "backup_on"
         const val BACKUP_FOLDER = "backup_folder"
         const val LAST_BACKUP = "last_backup"

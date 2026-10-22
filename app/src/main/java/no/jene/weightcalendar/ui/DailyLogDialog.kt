@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import no.jene.weightcalendar.data.WeightEntry
+import no.jene.weightcalendar.data.WeightUnit
 import no.jene.weightcalendar.ui.theme.GainBig
 import no.jene.weightcalendar.ui.theme.TextSecondary
 import java.time.LocalDate
@@ -35,8 +36,9 @@ fun DailyLogDialog(
 ) {
     // "remember { mutableStateOf(...) }" = a variable that survives redraws;
     // changing it makes Compose redraw the parts that use it.
-    var text by remember { mutableStateOf(existing?.let { "%.1f".format(it.weightKg) } ?: "") }
-    val weight = parseWeight(text)
+    val unit = LocalWeightUnit.current
+    var text by remember { mutableStateOf(existing?.let { "%.1f".format(unit.fromKg(it.weightKg)) } ?: "") }
+    val weight = parseWeight(text, unit)   // in kg
     var note by remember { mutableStateOf(existing?.note ?: "") }
 
     AlertDialog(
@@ -51,7 +53,7 @@ fun DailyLogDialog(
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("Weight (kg)") },
+                    label = { Text("Weight (${unit.label})") },
                     singleLine = true,
                     isError = text.isNotEmpty() && weight == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -79,10 +81,15 @@ fun DailyLogDialog(
     )
 }
 
-// Accepts "82.4" or "82,4" (the phone keyboard may use a comma), rounded to one decimal.
-// Returns null for anything that is not a plausible body weight.
+// Accepts "82.4" or "82,4" (the phone keyboard may use a comma) in the display unit,
+// rounded to one decimal, and returns it in kg.
+// Returns null for anything that is not a plausible body weight (20 to 400 kg).
 // "internal" = visible everywhere in this app (the goal dialog uses it too).
-internal fun parseWeight(text: String): Double? =
+//
+// The kg value is rounded to 0.01: 242.5 lb is 109.9955... kg, stored as 110.00, which
+// shows again as 242.5 lb. Without it, saving a day unchanged in lb would shift it a little.
+internal fun parseWeight(text: String, unit: WeightUnit): Double? =
     text.replace(',', '.').toDoubleOrNull()
+        ?.let { unit.toKg(Math.round(it * 10) / 10.0) }
+        ?.let { Math.round(it * 100) / 100.0 }
         ?.takeIf { it in 20.0..400.0 }
-        ?.let { Math.round(it * 10) / 10.0 }

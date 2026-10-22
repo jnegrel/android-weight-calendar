@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import no.jene.weightcalendar.data.WeightUnit
 import no.jene.weightcalendar.ui.theme.Background
 import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
@@ -43,12 +47,15 @@ fun SettingsScreen(
     onChooseBackupFolder: () -> Unit,
     onBackupEnabledChange: (Boolean) -> Unit,
     onBackupNow: () -> Unit,
+    unit: WeightUnit,
+    onUnitChange: (WeightUnit) -> Unit,
     onBack: () -> Unit,
 ) {
     // Which pop-up is open (rememberSaveable: still open after rotating the phone).
     var editingGoal by rememberSaveable { mutableStateOf(false) }
     var editingReminder by rememberSaveable { mutableStateOf(false) }
     var editingBackup by rememberSaveable { mutableStateOf(false) }
+    var editingUnit by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
@@ -62,7 +69,7 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),   // scrolls if the screen is too small
         ) {
             SettingsCard {
-                SettingRow("Weight goal", goal?.let { "%.1f kg".format(it) } ?: "Not set") { editingGoal = true }
+                SettingRow("Weight goal", goal?.let { unit.format(it) } ?: "Not set") { editingGoal = true }
                 HorizontalDivider(color = Background)
                 SettingRow(
                     "Daily reminder",
@@ -70,6 +77,9 @@ fun SettingsScreen(
                 ) { editingReminder = true }
                 HorizontalDivider(color = Background)
                 SettingRow("Daily backup", backupSummary(backup)) { editingBackup = true }
+            }
+            SettingsCard(Modifier.padding(top = 16.dp)) {
+                SettingRow("Unit", unit.label) { editingUnit = true }
             }
             SettingsCard(Modifier.padding(top = 16.dp)) {
                 SettingRow("About", "Weight Calendar $version", onClick = null)
@@ -92,6 +102,13 @@ fun SettingsScreen(
             onSave = { on, time -> onReminderChange(on, time); editingReminder = false },
         )
     }
+    if (editingUnit) {
+        UnitDialog(
+            current = unit,
+            onDismiss = { editingUnit = false },
+            onSelect = { onUnitChange(it); editingUnit = false },
+        )
+    }
     if (editingBackup) {
         BackupDialog(
             backup = backup,
@@ -101,6 +118,29 @@ fun SettingsScreen(
             onDismiss = { editingBackup = false },
         )
     }
+}
+
+// Choice between kg and lb: one line per unit, with a round radio button.
+@Composable
+private fun UnitDialog(current: WeightUnit, onDismiss: () -> Unit, onSelect: (WeightUnit) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Unit") },
+        text = {
+            Column {
+                for (unit in WeightUnit.entries) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onSelect(unit) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = unit == current, onClick = { onSelect(unit) })
+                        Text(if (unit == WeightUnit.KG) "Kilograms (kg)" else "Pounds (lb)")
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } },
+    )
 }
 
 // "On · last 19 Oct, 16:20", or "Off".

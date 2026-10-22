@@ -103,6 +103,7 @@ class WeightRepository(private val db: WeightDatabase) {
             "goal_kg" -> settings.goalKg = value.replace(',', '.').toDoubleOrNull()   // empty = no goal
             "reminder_on" -> settings.reminderEnabled = value == "1"
             "reminder_time" -> runCatching { LocalTime.parse(value) }.onSuccess { settings.reminderTime = it }
+            "unit" -> WeightUnit.entries.find { it.label == value }?.let { settings.unit = it }
         }
     }
 
@@ -137,6 +138,7 @@ class WeightRepository(private val db: WeightDatabase) {
     //   # goal_kg=100.0
     //   # reminder_on=1
     //   # reminder_time=09:00
+    //   # unit=kg
     //   date,weight_kg,estimated,note
     //   2026-10-12,110.00,0,"Restaurant, pizza"
     // Returns the number of days exported.
@@ -147,6 +149,7 @@ class WeightRepository(private val db: WeightDatabase) {
             out.write("# goal_kg=${settings.goalKg?.let { "%.1f".format(Locale.ROOT, it) } ?: ""}\n")
             out.write("# reminder_on=${if (settings.reminderEnabled) 1 else 0}\n")
             out.write("# reminder_time=${settings.reminderTime}\n")
+            out.write("# unit=${settings.unit.label}\n")
             out.write("date,weight_kg,estimated,note\n")
             for (e in rows) {
                 // Locale.ROOT forces a dot as decimal separator: on a French phone,

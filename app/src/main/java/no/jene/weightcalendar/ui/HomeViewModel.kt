@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import no.jene.weightcalendar.backup.Backup
 import no.jene.weightcalendar.data.Settings
 import no.jene.weightcalendar.data.WeightDatabase
+import no.jene.weightcalendar.data.WeightUnit
 import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.WeightRepository
 import no.jene.weightcalendar.data.toDays
@@ -56,6 +57,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         settings.reminderTime = time
         _reminder.value = ReminderSetting(enabled, time)
         Reminder.schedule(getApplication())   // plan (or cancel) the next reminder
+    }
+
+    // Display unit (kg or lb).
+    private val _unit = MutableStateFlow(settings.unit)
+    val unit: StateFlow<WeightUnit> = _unit
+
+    fun setUnit(unit: WeightUnit) {
+        settings.unit = unit
+        _unit.value = unit
     }
 
     // Daily backup settings, shown in the backup dialog.
@@ -110,6 +120,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             ?: error("Cannot open file")
         val count = input.use { repository.importCsv(it, settings) }
         _goal.value = settings.goalKg
+        _unit.value = settings.unit
         _reminder.value = ReminderSetting(settings.reminderEnabled, settings.reminderTime)
         Reminder.schedule(getApplication())
         return count

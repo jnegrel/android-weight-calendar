@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.SmoothedPoint
+import no.jene.weightcalendar.data.WeightUnit
 import no.jene.weightcalendar.data.monthlyAverage
 import no.jene.weightcalendar.data.trendOf
 import no.jene.weightcalendar.data.weeklyAverage
@@ -114,7 +115,8 @@ fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, goal: Double?, modifi
             },
     ) {
         val weeklyToEnd = weekly.filter { it.date <= end }
-        GraphHeader(points, weeklyToEnd, start, end)
+        val unit = LocalWeightUnit.current
+        GraphHeader(points, weeklyToEnd, start, end, unit)
         if (points.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("No data in this period", color = TextSecondary)
@@ -124,8 +126,8 @@ fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, goal: Double?, modifi
             Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
                 // The estimate only makes sense from the latest data, not from a past month.
                 val isLatest = end == days.keys.lastOrNull()
-                val goalLabel = goal?.let { goalLabel(it, if (isLatest) weeklyToEnd else emptyList()) }
-                drawGraph(grey, smoothed, start, end, goal, goalLabel, textMeasurer)
+                val goalLabel = goal?.let { goalLabel(it, if (isLatest) weeklyToEnd else emptyList(), unit) }
+                drawGraph(grey, smoothed, start, end, goal, goalLabel, unit, textMeasurer)
             }
         }
         PeriodSelector(period, onSelect = { period = it })
@@ -157,20 +159,22 @@ private fun PeriodSelector(selected: Period, onSelect: (Period) -> Unit) {
 //  110.3 kg                                   Last 30 days: -0.8 kg"
 // The 30-day change always comes from the weekly curve, whatever the period shown.
 @Composable
-private fun GraphHeader(points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate) {
+private fun GraphHeader(
+    points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate, unit: WeightUnit,
+) {
     val format = DateTimeFormatter.ofPattern("d MMM yyyy")
     Row(verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
             Text("Average", color = TextSecondary, fontSize = 14.sp)
             val average = points.map { it.entry.weightKg }.average()
-            Text(if (points.isEmpty()) "–" else "%.1f kg".format(average), color = TextPrimary, fontSize = 26.sp)
+            Text(if (points.isEmpty()) "–" else unit.format(average), color = TextPrimary, fontSize = 26.sp)
         }
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 4.dp)) {
             Text("${start.plusDays(1).format(format)} – ${end.format(format)}", color = TextSecondary, fontSize = 13.sp)
             monthlyChange(trend)?.let { change ->
                 // Coloured with the weekly rule, using the equivalent change per week.
                 val color = trendOf(change * 7 / MONTH_DAYS).color()
-                Text("Last 30 days: %+.1f kg".format(change), color = color, fontSize = 15.sp)
+                Text("Last 30 days: " + unit.formatChange(change), color = color, fontSize = 15.sp)
             }
         }
     }
@@ -189,8 +193,8 @@ private fun monthlyChange(trend: List<SmoothedPoint>): Double? {
 // "Goal 100.0 kg · ~Mar 2027": the date when the 7-day average reaches the goal if the
 // change of the last 30 days goes on at the same pace. Without a date when there is no
 // recent trend, or when the weight is moving away from the goal.
-private fun goalLabel(goal: Double, trend: List<SmoothedPoint>): String {
-    val label = "Goal %.1f kg".format(goal)
+private fun goalLabel(goal: Double, trend: List<SmoothedPoint>, unit: WeightUnit): String {
+    val label = "Goal " + unit.format(goal)
     val last = trend.lastOrNull() ?: return label
     val remaining = goal - last.weightKg
     if (abs(remaining) < 0.2) return "$label · reached"
@@ -205,7 +209,7 @@ private fun goalLabel(goal: Double, trend: List<SmoothedPoint>): String {
 // and y grows downwards, so a heavier weight must get a *smaller* y.
 private fun DrawScope.drawGraph(
     grey: List<SmoothedPoint>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate,
-    goal: Double?, goalLabel: String?, textMeasurer: TextMeasurer,
+    goal: Double?, goalLabel: String?, unit: WeightUnit, textMeasurer: TextMeasurer,
 ) {
     val labelStyle = TextStyle(color = TextSecondary, fontSize = 11.sp)
     val left = 34.dp.toPx()                  // room for the kg labels
@@ -225,18 +229,23 @@ private fun DrawScope.drawGraph(
     // Conversions from data (date, kg) to pixels.
     val windowDays = ChronoUnit.DAYS.between(start, end).coerceAtLeast(1)
     fun x(date: LocalDate) = left + width * ChronoUnit.DAYS.between(start, date) / windowDays
-    fun y(kg: Double) = (bottom * (high - kg) / (high - low)).toFloat()
+    // The axis is drawn in the display unit: yUnit() takes a value in kg or lb,
+    // y() takes kg (the data) and converts it first.
+    val lowUnit = unit.fromKg(low)
+    val highUnit = unit.fromKg(high)
+    fun yUnit(value: Double) = (bottom * (highUnit - value) / (highUnit - lowUnit)).toFloat()
+    fun y(kg: Double) = yUnit(unit.fromKg(kg))
 
-    // Horizontal grid lines with kg labels: the smallest step (1, 2, 5 or 10 kg) that keeps
-    // the labels at least 20 dp apart, so they stay readable however small the graph is.
-    val step = listOf(1, 2, 5, 10).firstOrNull { y(low) - y(low + it) >= 20.dp.toPx() } ?: 20
-    var kg = ceil(low / step) * step
-    while (kg <= high) {
-        val yPos = y(kg)
+    // Horizontal grid lines with labels: the smallest step (1, 2, 5, 10 or 20 kg or lb) that
+    // keeps the labels at least 20 dp apart, so they stay readable however small the graph is.
+    val step = listOf(1, 2, 5, 10).firstOrNull { yUnit(lowUnit) - yUnit(lowUnit + it) >= 20.dp.toPx() } ?: 20
+    var value = ceil(lowUnit / step) * step
+    while (value <= highUnit) {
+        val yPos = yUnit(value)
         drawLine(TextSecondary.copy(alpha = 0.15f), Offset(left, yPos), Offset(size.width, yPos), 1.dp.toPx())
-        val label = textMeasurer.measure("%.0f".format(kg), labelStyle)
+        val label = textMeasurer.measure("%.0f".format(value), labelStyle)
         drawText(label, topLeft = Offset(left - label.size.width - 6.dp.toPx(), yPos - label.size.height / 2))
-        kg += step
+        value += step
     }
 
     // Date labels with a small tick mark, spaced so they don't overlap:

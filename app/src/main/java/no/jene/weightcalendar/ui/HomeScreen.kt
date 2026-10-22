@@ -24,6 +24,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +71,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val goal by viewModel.goal.collectAsStateWithLifecycle()
     val reminder by viewModel.reminder.collectAsStateWithLifecycle()
     val backup by viewModel.backup.collectAsStateWithLifecycle()
+    val unit by viewModel.unit.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -121,30 +123,35 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     // A single extra screen doesn't need a navigation library: a true/false is enough.
     var showSettings by rememberSaveable { mutableStateOf(false) }
 
-    if (showSettings) {
-        // Android's back gesture/button closes the settings instead of leaving the app.
-        BackHandler { showSettings = false }
-        SettingsScreen(
-            goal = goal,
-            onGoalChange = viewModel::setGoal,
-            reminder = reminder,
-            onReminderChange = ::setReminder,
-            backup = backup,
-            onChooseBackupFolder = { pickFolder.launch(null) },
-            onBackupEnabledChange = viewModel::setBackupEnabled,
-            onBackupNow = { runFileTask { "Backup written: ${viewModel.backupNow()}" } },
-            onBack = { showSettings = false },
-        )
-    } else {
-        HomeContent(
-            days = days,
-            goal = goal,
-            onSave = viewModel::setWeight,
-            onDelete = viewModel::delete,
-            onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
-            onExport = { createCsv.launch("weights-${LocalDate.now()}.csv") },  // suggested file name
-            onSettings = { viewModel.refreshBackup(); showSettings = true },
-        )
+    // Everything inside can read the unit with LocalWeightUnit.current (see LocalWeightUnit.kt).
+    CompositionLocalProvider(LocalWeightUnit provides unit) {
+        if (showSettings) {
+            // Android's back gesture/button closes the settings instead of leaving the app.
+            BackHandler { showSettings = false }
+            SettingsScreen(
+                goal = goal,
+                onGoalChange = viewModel::setGoal,
+                reminder = reminder,
+                onReminderChange = ::setReminder,
+                backup = backup,
+                onChooseBackupFolder = { pickFolder.launch(null) },
+                onBackupEnabledChange = viewModel::setBackupEnabled,
+                onBackupNow = { runFileTask { "Backup written: ${viewModel.backupNow()}" } },
+                unit = unit,
+                onUnitChange = viewModel::setUnit,
+                onBack = { showSettings = false },
+            )
+        } else {
+            HomeContent(
+                days = days,
+                goal = goal,
+                onSave = viewModel::setWeight,
+                onDelete = viewModel::delete,
+                onImport = { pickCsv.launch(arrayOf("text/*", "application/*")) },
+                onExport = { createCsv.launch("weights-${LocalDate.now()}.csv") },  // suggested file name
+                onSettings = { viewModel.refreshBackup(); showSettings = true },
+            )
+        }
     }
 }
 

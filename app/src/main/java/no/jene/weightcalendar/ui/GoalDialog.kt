@@ -20,8 +20,9 @@ fun GoalDialog(
     onDismiss: () -> Unit,
     onSave: (Double?) -> Unit,   // null = remove the goal
 ) {
-    var text by remember { mutableStateOf(current?.let { "%.1f".format(it) } ?: "") }
-    val weight = parseWeight(text)
+    val unit = LocalWeightUnit.current
+    var text by remember { mutableStateOf(current?.let { "%.1f".format(unit.fromKg(it)) } ?: "") }
+    val weight = parseWeight(text, unit)   // in kg
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -30,7 +31,7 @@ fun GoalDialog(
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("Goal (kg)") },
+                label = { Text("Goal (${unit.label})") },
                 singleLine = true,
                 isError = text.isNotEmpty() && weight == null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
