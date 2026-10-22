@@ -15,8 +15,8 @@ android {
         targetSdk = 37       // Android 17
         // versionCode must increase with every APK installed on the phone,
         // otherwise Android refuses the update. versionName is what the user sees.
-        versionCode = 7
-        versionName = "1.5"
+        versionCode = 8
+        versionName = "2.0"
 
         // Runs the tests of app/src/androidTest on a device or emulator.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
