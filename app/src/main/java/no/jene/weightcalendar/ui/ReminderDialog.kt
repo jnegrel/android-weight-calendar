@@ -17,8 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.time.LocalTime
+import no.jene.weightcalendar.R
 
 // Pop-up to turn the daily reminder on/off and choose its time.
 // @OptIn: Material3's time picker is still marked "experimental" (its API may change).
@@ -35,11 +37,11 @@ fun ReminderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Daily reminder") },
+        title = { Text(stringResource(R.string.reminder_title)) },
         text = {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Notify me if today's weight is not logged", Modifier.weight(1f))
+                    Text(stringResource(R.string.reminder_switch), Modifier.weight(1f))
                     Switch(checked = on, onCheckedChange = { on = it })
                 }
                 if (on) {
@@ -49,10 +51,10 @@ fun ReminderDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(on, LocalTime.of(timeState.hour, timeState.minute)) }) { Text("SAVE") }
+            TextButton(onClick = { onSave(on, LocalTime.of(timeState.hour, timeState.minute)) }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("CANCEL") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

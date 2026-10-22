@@ -28,12 +28,20 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
+import no.jene.weightcalendar.R
 import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.Trend
 import no.jene.weightcalendar.ui.theme.AccentBlue
@@ -47,12 +55,6 @@ import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.TextSecondary
 import no.jene.weightcalendar.ui.theme.Today
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 
 // The colour of each trend, shared with the graph.
 fun Trend.color(): Color = when (this) {
@@ -230,14 +232,18 @@ private fun DayCell(
 @Composable
 private fun SelectedDayLine(date: LocalDate, day: Day?, onEdit: () -> Unit) {
     val unit = LocalWeightUnit.current
+    // stringResource can't be called inside buildString { }, so the texts are read first.
+    val pattern = stringResource(R.string.pattern_day)
+    val noEntry = stringResource(R.string.no_entry)
+    val estimated = stringResource(R.string.estimated)
     val text = buildString {
-        append(date.format(DateTimeFormatter.ofPattern("EEEE d MMMM")))
+        append(date.format(DateTimeFormatter.ofPattern(pattern)))
         if (day == null) {
-            append("  ·  no entry")
+            append("  ·  $noEntry")
         } else {
             append("  ·  " + unit.format(day.entry.weightKg))
             day.delta?.let { append("  ·  %+.1f".format(unit.fromKg(it))) }
-            if (day.entry.estimated) append("  (estimated)")
+            if (day.entry.estimated) append("  $estimated")
         }
     }
     Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -249,6 +255,6 @@ private fun SelectedDayLine(date: LocalDate, day: Day?, onEdit: () -> Unit) {
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        TextButton(onClick = onEdit) { Text(if (day == null) "ADD" else "EDIT", color = AccentBlue) }
+        TextButton(onClick = onEdit) { Text(stringResource(if (day == null) R.string.add else R.string.edit), color = AccentBlue) }
     }
 }

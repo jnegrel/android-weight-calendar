@@ -15,13 +15,13 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
 import no.jene.weightcalendar.MainActivity
 import no.jene.weightcalendar.R
 import no.jene.weightcalendar.data.Settings
 import no.jene.weightcalendar.data.WeightDatabase
-import java.time.Duration
-import java.time.LocalDate
-import java.time.LocalDateTime
 
 // Daily reminder: at the chosen time, if today has no weight yet, show a notification.
 //
@@ -62,7 +62,9 @@ object Reminder {
 
         // A "channel" groups notifications; the user can tune it in the phone's settings.
         // Creating it again when it already exists does nothing.
-        val channel = NotificationChannel(CHANNEL_ID, "Daily reminder", NotificationManager.IMPORTANCE_DEFAULT)
+        val channel = NotificationChannel(
+            CHANNEL_ID, context.getString(R.string.reminder_title), NotificationManager.IMPORTANCE_DEFAULT,
+        )
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
 
         // What happens on tap: open the app. A PendingIntent is an "intent to open something
@@ -73,8 +75,8 @@ object Reminder {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Weight Calendar")
-            .setContentText("You haven't logged your weight today.")
+            .setContentTitle(context.getString(R.string.app_name))
+            .setContentText(context.getString(R.string.notification_text))
             .setContentIntent(openApp)
             .setAutoCancel(true)            // disappears when tapped
             .build()

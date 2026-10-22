@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,7 +45,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.YearMonth
 import kotlinx.coroutines.launch
+import no.jene.weightcalendar.R
 import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.WeightEntry
 import no.jene.weightcalendar.data.toDays
@@ -53,9 +58,6 @@ import no.jene.weightcalendar.ui.theme.ButtonEnd
 import no.jene.weightcalendar.ui.theme.ButtonStart
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.WeightCalendarTheme
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.YearMonth
 
 // A @Composable function describes a piece of UI. Compose calls it to draw the screen,
 // and calls it again whenever the data it uses changes.
@@ -78,7 +80,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     // Runs a file operation in the background and shows its outcome in a Toast (short pop-up).
     fun runFileTask(task: suspend () -> String) {
         scope.launch {
-            val message = try { task() } catch (e: Exception) { "Failed: ${e.message}" }
+            val message = try { task() } catch (e: Exception) { context.getString(R.string.failed, e.message) }
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
@@ -91,7 +93,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     // Since Android 13, the user must allow notifications. Asked when the reminder is turned on
     // (in its dialog, or by importing a backup where it is on).
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) Toast.makeText(context, "Notifications blocked: the reminder won't show", Toast.LENGTH_LONG).show()
+        if (!granted) Toast.makeText(context, R.string.notifications_blocked, Toast.LENGTH_LONG).show()
     }
     fun askNotificationsIfNeeded() {
         val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -112,11 +114,15 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         if (uri != null) runFileTask {
             val count = viewModel.importCsv(uri)
             askNotificationsIfNeeded()
-            "Imported $count days"
+            // getQuantityString: picks "1 day" or "2 days" by the rules of the language.
+            context.resources.getQuantityString(R.plurals.imported_days, count, count)
         }
     }
     val createCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) runFileTask { "Exported ${viewModel.exportCsv(uri)} days" }
+        if (uri != null) runFileTask {
+            val count = viewModel.exportCsv(uri)
+            context.resources.getQuantityString(R.plurals.exported_days, count, count)
+        }
     }
 
     // Which screen is shown: the home screen, or the settings on top of it.
@@ -136,7 +142,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                 backup = backup,
                 onChooseBackupFolder = { pickFolder.launch(null) },
                 onBackupEnabledChange = viewModel::setBackupEnabled,
-                onBackupNow = { runFileTask { "Backup written: ${viewModel.backupNow()}" } },
+                onBackupNow = { runFileTask { context.getString(R.string.backup_written, viewModel.backupNow()) } },
                 unit = unit,
                 onUnitChange = viewModel::setUnit,
                 onBack = { showSettings = false },
@@ -179,7 +185,7 @@ private fun HomeContent(
             .fillMaxSize()
             .background(Background)
     ) {
-        AppHeader("Weight Calendar") { MainMenu(onImport, onExport, onSettings) }
+        AppHeader(stringResource(R.string.app_name)) { MainMenu(onImport, onExport, onSettings) }
 
         Column(
             modifier = Modifier
@@ -217,9 +223,9 @@ private fun BoxScope.MainMenu(onImport: () -> Unit, onExport: () -> Unit, onSett
     Box(Modifier.align(Alignment.CenterEnd)) {
         TextButton(onClick = { menuOpen = true }) { Text("⋮", color = TextPrimary, fontSize = 26.sp) }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(text = { Text("Import CSV") }, onClick = { menuOpen = false; onImport() })
-            DropdownMenuItem(text = { Text("Export CSV") }, onClick = { menuOpen = false; onExport() })
-            DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; onSettings() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.menu_import)) }, onClick = { menuOpen = false; onImport() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.menu_export)) }, onClick = { menuOpen = false; onExport() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.settings)) }, onClick = { menuOpen = false; onSettings() })
         }
     }
 }
@@ -237,7 +243,7 @@ private fun DailyLogButton(onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text("DAILY LOG", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+        Text(stringResource(R.string.daily_log), color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Medium)
     }
 }
 

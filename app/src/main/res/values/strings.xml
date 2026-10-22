@@ -1,3 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texts shown in the app. Default language (English); the other languages are in
+     values-fr, values-nb (Norwegian bokmål), values-de, values-es. Android picks the
+     file matching the phone (or app) language. %1$s / %1$d = a value inserted by the code. -->
 <resources>
     <string name="app_name">Weight Calendar</string>
+    <string name="menu_import">Import CSV</string>
+    <string name="menu_export">Export CSV</string>
+    <string name="settings">Settings</string>
+    <string name="daily_log">DAILY LOG</string>
+    <string name="add">ADD</string>
+    <string name="edit">EDIT</string>
+    <string name="save">SAVE</string>
+    <string name="cancel">CANCEL</string>
+    <string name="delete">DELETE</string>
+    <string name="remove">REMOVE</string>
+    <string name="close">CLOSE</string>
+    <string name="choose">CHOOSE</string>
+    <string name="back_up_now">BACK UP NOW</string>
+    <string name="no_entry">no entry</string>
+    <string name="estimated">(estimated)</string>
+    <string name="estimated_day_hint">Estimated day. Saving makes it a measured day.</string>
+    <string name="weight_label">Weight (%1$s)</string>
+    <string name="note_label">Note (optional)</string>
+    <string name="goal_title">Weight goal</string>
+    <string name="goal_label">Goal (%1$s)</string>
+    <string name="goal_graph">Goal %1$s</string>
+    <string name="goal_reached">reached</string>
+    <string name="goal_far">&gt; 5 years</string>
+    <string name="not_set">Not set</string>
+    <string name="reminder_title">Daily reminder</string>
+    <string name="reminder_switch">Notify me if today’s weight is not logged</string>
+    <string name="reminder_summary">Every day at %1$s</string>
+    <string name="notification_text">You haven’t logged your weight today.</string>
+    <string name="notifications_blocked">Notifications blocked: the reminder won’t show</string>
+    <string name="off">Off</string>
+    <string name="failed">Failed: %1$s</string>
+    <string name="backup_title">Daily backup</string>
+    <string name="backup_explanation">Once a day, a CSV backup is written to the folder below, and the last %1$d are kept. A sync app (cloud, NAS) can then copy that folder.</string>
+    <string name="backup_folder">Folder: %1$s</string>
+    <string name="backup_no_folder">No folder chosen</string>
+    <string name="backup_switch">Back up every day</string>
+    <string name="backup_last">Last backup: %1$s</string>
+    <string name="backup_summary">On · last %1$s</string>
+    <string name="backup_written">Backup written: %1$s</string>
+    <string name="never">never</string>
+    <string name="unit_title">Unit</string>
+    <string name="unit_kg">Kilograms (kg)</string>
+    <string name="unit_lb">Pounds (lb)</string>
+    <string name="language_title">Language</string>
+    <string name="about_title">About</string>
+    <string name="average">Average</string>
+    <string name="last_30_days">Last 30 days: %1$s</string>
+    <string name="no_data_period">No data in this period</string>
+    <string name="period_1y">1Y</string>
+    <string name="period_2y">2Y</string>
+    <string name="period_5y">5Y</string>
+    <string name="period_all">All</string>
+    <string name="pattern_day">EEEE d MMMM</string>
+    <string name="pattern_day_year">EEEE d MMMM yyyy</string>
+    <string name="pattern_date">d MMM yyyy</string>
+    <string name="pattern_date_time">d MMM, HH:mm</string>
+    <plurals name="imported_days">
+        <item quantity="one">Imported %d day</item>
+        <item quantity="other">Imported %d days</item>
+    </plurals>
+    <plurals name="exported_days">
+        <item quantity="one">Exported %d day</item>
+        <item quantity="other">Exported %d days</item>
+    </plurals>
 </resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Languages the app is translated into. Since Android 13, they are offered in
+     Settings > Apps > Weight Calendar > Language, to use another language than the phone's. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="fr" />
+    <locale android:name="nb" />
+    <locale android:name="de" />
+    <locale android:name="es" />
+</locale-config>

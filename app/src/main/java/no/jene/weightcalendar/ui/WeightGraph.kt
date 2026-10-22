@@ -1,5 +1,6 @@
 package no.jene.weightcalendar.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -36,6 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.sign
+import no.jene.weightcalendar.R
 import no.jene.weightcalendar.data.Day
 import no.jene.weightcalendar.data.SmoothedPoint
 import no.jene.weightcalendar.data.WeightUnit
@@ -48,19 +58,14 @@ import no.jene.weightcalendar.ui.theme.GoalLine
 import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.TextSecondary
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.sign
 
 // The periods the graph can show, in the order of the selector under the graph.
 // Like tabs: swiping left goes to the next one (longer period), swiping right to the previous.
 // `years = null` means everything since the first logged day.
-enum class Period(val label: String, val years: Long?) {
-    ONE_YEAR("1Y", 1), TWO_YEARS("2Y", 2), FIVE_YEARS("5Y", 5), ALL("All", null)
+// `label` is a text resource (R.string...): the short name differs between languages.
+enum class Period(@StringRes val label: Int, val years: Long?) {
+    ONE_YEAR(R.string.period_1y, 1), TWO_YEARS(R.string.period_2y, 2),
+    FIVE_YEARS(R.string.period_5y, 5), ALL(R.string.period_all, null)
 }
 
 // Weight graph over the chosen period: a thin light-grey line for the details, and on top
@@ -119,14 +124,15 @@ fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, goal: Double?, modifi
         GraphHeader(points, weeklyToEnd, start, end, unit)
         if (points.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("No data in this period", color = TextSecondary)
+                Text(stringResource(R.string.no_data_period), color = TextSecondary)
             }
         } else {
             val textMeasurer = rememberTextMeasurer()
+            // The estimate only makes sense from the latest data, not from a past month.
+            // (Computed here and not in the Canvas below: drawing code can't read texts.)
+            val isLatest = end == days.keys.lastOrNull()
+            val goalLabel = goal?.let { goalLabel(it, if (isLatest) weeklyToEnd else emptyList(), unit) }
             Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
-                // The estimate only makes sense from the latest data, not from a past month.
-                val isLatest = end == days.keys.lastOrNull()
-                val goalLabel = goal?.let { goalLabel(it, if (isLatest) weeklyToEnd else emptyList(), unit) }
                 drawGraph(grey, smoothed, start, end, goal, goalLabel, unit, textMeasurer)
             }
         }
@@ -141,7 +147,7 @@ private fun PeriodSelector(selected: Period, onSelect: (Period) -> Unit) {
         for (p in Period.entries) {
             val isSelected = p == selected
             Text(
-                p.label,
+                stringResource(p.label),
                 color = if (isSelected) TextPrimary else TextSecondary,
                 fontSize = 13.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -162,10 +168,10 @@ private fun PeriodSelector(selected: Period, onSelect: (Period) -> Unit) {
 private fun GraphHeader(
     points: List<Day>, trend: List<SmoothedPoint>, start: LocalDate, end: LocalDate, unit: WeightUnit,
 ) {
-    val format = DateTimeFormatter.ofPattern("d MMM yyyy")
+    val format = DateTimeFormatter.ofPattern(stringResource(R.string.pattern_date))
     Row(verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
-            Text("Average", color = TextSecondary, fontSize = 14.sp)
+            Text(stringResource(R.string.average), color = TextSecondary, fontSize = 14.sp)
             val average = points.map { it.entry.weightKg }.average()
             Text(if (points.isEmpty()) "–" else unit.format(average), color = TextPrimary, fontSize = 26.sp)
         }
@@ -174,7 +180,7 @@ private fun GraphHeader(
             monthlyChange(trend)?.let { change ->
                 // Coloured with the weekly rule, using the equivalent change per week.
                 val color = trendOf(change * 7 / MONTH_DAYS).color()
-                Text("Last 30 days: " + unit.formatChange(change), color = color, fontSize = 15.sp)
+                Text(stringResource(R.string.last_30_days, unit.formatChange(change)), color = color, fontSize = 15.sp)
             }
         }
     }
@@ -193,15 +199,19 @@ private fun monthlyChange(trend: List<SmoothedPoint>): Double? {
 // "Goal 100.0 kg · ~Mar 2027": the date when the 7-day average reaches the goal if the
 // change of the last 30 days goes on at the same pace. Without a date when there is no
 // recent trend, or when the weight is moving away from the goal.
+// @Composable only to read the texts with stringResource.
+@Composable
 private fun goalLabel(goal: Double, trend: List<SmoothedPoint>, unit: WeightUnit): String {
-    val label = "Goal " + unit.format(goal)
+    val label = stringResource(R.string.goal_graph, unit.format(goal))
+    val reached = stringResource(R.string.goal_reached)
+    val far = stringResource(R.string.goal_far)
     val last = trend.lastOrNull() ?: return label
     val remaining = goal - last.weightKg
-    if (abs(remaining) < 0.2) return "$label · reached"
+    if (abs(remaining) < 0.2) return "$label · $reached"
     val perDay = (monthlyChange(trend) ?: return label) / MONTH_DAYS
     if (perDay == 0.0 || sign(perDay) != sign(remaining)) return label   // wrong way
     val daysLeft = (remaining / perDay).toLong()
-    if (daysLeft > 5 * 365) return "$label · > 5 years"
+    if (daysLeft > 5 * 365) return "$label · $far"
     return "$label · ~" + last.date.plusDays(daysLeft).format(DateTimeFormatter.ofPattern("MMM yyyy"))
 }
 

@@ -10,7 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import no.jene.weightcalendar.R
 import no.jene.weightcalendar.ui.theme.GainBig
 
 // Pop-up to set, change or remove the weight goal. Same layout as the daily log dialog.
@@ -26,25 +28,25 @@ fun GoalDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Weight goal") },
+        title = { Text(stringResource(R.string.goal_title)) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("Goal (${unit.label})") },
+                label = { Text(stringResource(R.string.goal_label, unit.label)) },
                 singleLine = true,
                 isError = text.isNotEmpty() && weight == null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSave(weight) }, enabled = weight != null) { Text("SAVE") }
+            TextButton(onClick = { onSave(weight) }, enabled = weight != null) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
             if (current != null) {
-                TextButton(onClick = { onSave(null) }) { Text("REMOVE", color = GainBig) }
+                TextButton(onClick = { onSave(null) }) { Text(stringResource(R.string.remove), color = GainBig) }
             }
-            TextButton(onClick = onDismiss) { Text("CANCEL") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

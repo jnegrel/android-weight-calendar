@@ -1,5 +1,8 @@
 package no.jene.weightcalendar.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -14,8 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,15 +28,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import no.jene.weightcalendar.R
 import no.jene.weightcalendar.data.WeightUnit
 import no.jene.weightcalendar.ui.theme.Background
 import no.jene.weightcalendar.ui.theme.Surface
 import no.jene.weightcalendar.ui.theme.TextPrimary
 import no.jene.weightcalendar.ui.theme.TextSecondary
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
 // Settings screen: one row per setting (title on the left, current value on the right).
 // Tapping a row opens the same pop-ups as before; the screen itself only lists them.
@@ -61,7 +67,7 @@ fun SettingsScreen(
     val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
 
     Column(Modifier.fillMaxSize().background(Background)) {
-        AppHeader("Settings", onBack = onBack)
+        AppHeader(stringResource(R.string.settings), onBack = onBack)
         Column(
             Modifier
                 .padding(16.dp)
@@ -69,20 +75,33 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),   // scrolls if the screen is too small
         ) {
             SettingsCard {
-                SettingRow("Weight goal", goal?.let { unit.format(it) } ?: "Not set") { editingGoal = true }
+                SettingRow(stringResource(R.string.goal_title), goal?.let { unit.format(it) } ?: stringResource(R.string.not_set)) { editingGoal = true }
                 HorizontalDivider(color = Background)
                 SettingRow(
-                    "Daily reminder",
-                    if (reminder.enabled) "Every day at ${reminder.time}" else "Off",
+                    stringResource(R.string.reminder_title),
+                    if (reminder.enabled) stringResource(R.string.reminder_summary, reminder.time.toString())
+                    else stringResource(R.string.off),
                 ) { editingReminder = true }
                 HorizontalDivider(color = Background)
-                SettingRow("Daily backup", backupSummary(backup)) { editingBackup = true }
+                SettingRow(stringResource(R.string.backup_title), backupSummary(backup)) { editingBackup = true }
             }
             SettingsCard(Modifier.padding(top = 16.dp)) {
-                SettingRow("Unit", unit.label) { editingUnit = true }
+                SettingRow(stringResource(R.string.unit_title), unit.label) { editingUnit = true }
+                // The app's own language setting exists since Android 13 (API 33, "TIRAMISU").
+                // Android shows it (with the languages of locales_config.xml); we just open it.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    HorizontalDivider(color = Background)
+                    SettingRow(stringResource(R.string.language_title), currentLanguage()) {
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_APP_LOCALE_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        )
+                        context.startActivity(intent)
+                    }
+                }
             }
             SettingsCard(Modifier.padding(top = 16.dp)) {
-                SettingRow("About", "Weight Calendar $version", onClick = null)
+                SettingRow(stringResource(R.string.about_title), "${stringResource(R.string.app_name)} $version", onClick = null)
             }
         }
     }
@@ -125,7 +144,7 @@ fun SettingsScreen(
 private fun UnitDialog(current: WeightUnit, onDismiss: () -> Unit, onSelect: (WeightUnit) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Unit") },
+        title = { Text(stringResource(R.string.unit_title)) },
         text = {
             Column {
                 for (unit in WeightUnit.entries) {
@@ -134,20 +153,29 @@ private fun UnitDialog(current: WeightUnit, onDismiss: () -> Unit, onSelect: (We
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = unit == current, onClick = { onSelect(unit) })
-                        Text(if (unit == WeightUnit.KG) "Kilograms (kg)" else "Pounds (lb)")
+                        Text(stringResource(if (unit == WeightUnit.KG) R.string.unit_kg else R.string.unit_lb))
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
+// "Français", "Norsk bokmål"...: the language the app is shown in, in that language.
+private fun currentLanguage(): String {
+    val locale = Locale.getDefault()
+    return locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
+}
+
 // "On · last 19 Oct, 16:20", or "Off".
+// @Composable only to read the texts with stringResource.
+@Composable
 private fun backupSummary(backup: BackupSetting): String {
-    if (!backup.enabled || backup.folderName == null) return "Off"
-    val last = backup.lastBackup?.format(DateTimeFormatter.ofPattern("d MMM, HH:mm")) ?: "never"
-    return "On · last $last"
+    if (!backup.enabled || backup.folderName == null) return stringResource(R.string.off)
+    val last = backup.lastBackup?.format(DateTimeFormatter.ofPattern(stringResource(R.string.pattern_date_time)))
+        ?: stringResource(R.string.never)
+    return stringResource(R.string.backup_summary, last)
 }
 
 // A rounded dark card, like the calendar and the graph, holding a group of rows.

@@ -13,15 +13,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import no.jene.weightcalendar.R
 import no.jene.weightcalendar.data.WeightEntry
 import no.jene.weightcalendar.data.WeightUnit
 import no.jene.weightcalendar.ui.theme.GainBig
 import no.jene.weightcalendar.ui.theme.TextSecondary
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 // Pop-up to type, change or delete the weight of one day, with an optional note.
 // `existing` is the day's current entry, if any: its weight is pre-filled, and a measured
@@ -43,17 +45,17 @@ fun DailyLogDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(date.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy"))) },
+        title = { Text(date.format(DateTimeFormatter.ofPattern(stringResource(R.string.pattern_day_year)))) },
         text = {
             Column {
                 if (existing?.estimated == true) {
-                    Text("Estimated day. Saving makes it a measured day.",
+                    Text(stringResource(R.string.estimated_day_hint),
                         color = TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
                 }
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("Weight (${unit.label})") },
+                    label = { Text(stringResource(R.string.weight_label, unit.label)) },
                     singleLine = true,
                     isError = text.isNotEmpty() && weight == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -62,7 +64,7 @@ fun DailyLogDialog(
                     value = note,
                     // One line (a line break would also break the CSV export), at most 200 characters.
                     onValueChange = { note = it.replace('\n', ' ').take(200) },
-                    label = { Text("Note (optional)") },
+                    label = { Text(stringResource(R.string.note_label)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.padding(top = 8.dp),
@@ -70,13 +72,13 @@ fun DailyLogDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { weight?.let { onSave(it, note.trim().ifEmpty { null }) } }, enabled = weight != null) { Text("SAVE") }
+            TextButton(onClick = { weight?.let { onSave(it, note.trim().ifEmpty { null }) } }, enabled = weight != null) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
             if (existing != null && !existing.estimated) {
-                TextButton(onClick = onDelete) { Text("DELETE", color = GainBig) }
+                TextButton(onClick = onDelete) { Text(stringResource(R.string.delete), color = GainBig) }
             }
-            TextButton(onClick = onDismiss) { Text("CANCEL") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
