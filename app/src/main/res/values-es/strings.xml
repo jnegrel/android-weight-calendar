@@ -49,6 +49,7 @@
     <string name="average">Media</string>
     <string name="last_30_days">Últimos 30 días: %1$s</string>
     <string name="no_data_period">Sin datos en este periodo</string>
+    <string name="no_data_yet">Aún no hay ningún peso. Toca %1$s para añadir el de hoy o importa una copia CSV desde el menú ⋮.</string>
     <string name="period_1y">1A</string>
     <string name="period_2y">2A</string>
     <string name="period_5y">5A</string>

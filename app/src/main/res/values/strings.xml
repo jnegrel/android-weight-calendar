@@ -52,6 +52,7 @@
     <string name="average">Average</string>
     <string name="last_30_days">Last 30 days: %1$s</string>
     <string name="no_data_period">No data in this period</string>
+    <string name="no_data_yet">No weight yet. Tap %1$s to add today’s weight, or import a CSV backup from the ⋮ menu.</string>
     <string name="period_1y">1Y</string>
     <string name="period_2y">2Y</string>
     <string name="period_5y">5Y</string>

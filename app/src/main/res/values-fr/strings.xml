@@ -49,6 +49,7 @@
     <string name="average">Moyenne</string>
     <string name="last_30_days">30 derniers jours : %1$s</string>
     <string name="no_data_period">Aucune donnée sur cette période</string>
+    <string name="no_data_yet">Aucun poids pour l’instant. Touchez %1$s pour ajouter celui d’aujourd’hui, ou importez une sauvegarde CSV depuis le menu ⋮.</string>
     <string name="period_1y">1A</string>
     <string name="period_2y">2A</string>
     <string name="period_5y">5A</string>

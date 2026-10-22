@@ -35,6 +35,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,9 +81,14 @@ enum class Period(@StringRes val label: Int, val years: Long?) {
 fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, goal: Double?, modifier: Modifier = Modifier) {
     var period by rememberSaveable { mutableStateOf(Period.ONE_YEAR) }
     // The day before the first one shown (the graph starts just after it).
-    val start = when (val years = period.years) {
-        null -> days.keys.minOrNull()?.minusDays(1) ?: end.minusYears(1)
-        else -> end.minusYears(years)
+    // With less data than the period (a new user), the graph starts at the first weight
+    // instead of leaving the year empty, but always shows at least a week.
+    val dataStart = days.keys.minOrNull()?.let { minOf(it.minusDays(1), end.minusDays(7)) }
+    val years = period.years
+    val start = when {
+        dataStart == null -> end.minusYears(years ?: 1)          // no data at all
+        years == null -> dataStart                               // All: from the first weight
+        else -> maxOf(end.minusYears(years), dataStart)          // 1Y/2Y/5Y, or less if less data
     }
     fun inWindow(date: LocalDate) = date > start && date <= end
     // remember(...): only recompute when the data (or the window) changes, not on every redraw.
@@ -123,8 +129,11 @@ fun WeightGraph(days: Map<LocalDate, Day>, end: LocalDate, goal: Double?, modifi
         val unit = LocalWeightUnit.current
         GraphHeader(points, weeklyToEnd, start, end, unit)
         if (points.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.no_data_period), color = TextSecondary)
+            Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                // No data at all (first use): say how to start. Otherwise only this period is empty.
+                val message = if (days.isEmpty()) stringResource(R.string.no_data_yet, stringResource(R.string.daily_log))
+                    else stringResource(R.string.no_data_period)
+                Text(message, color = TextSecondary, textAlign = TextAlign.Center)
             }
         } else {
             val textMeasurer = rememberTextMeasurer()
@@ -258,9 +267,10 @@ private fun DrawScope.drawGraph(
         value += step
     }
 
-    // Date labels with a small tick mark, spaced so they don't overlap:
-    // every 3 months for one year (Jan, Apr, Jul, Oct), 6 months for two, else every January.
+    // Date labels with a small tick mark, spaced so they don't overlap: every month for a
+    // few months, every 3 months for one year (Jan, Apr, Jul, Oct), 6 for two, else every January.
     val (monthStep, monthFormat) = when {
+        windowDays <= 120 -> 1 to DateTimeFormatter.ofPattern("MMM yyyy")
         windowDays <= 400 -> 3 to DateTimeFormatter.ofPattern("MMM yyyy")
         windowDays <= 800 -> 6 to DateTimeFormatter.ofPattern("MMM yyyy")
         else -> 12 to DateTimeFormatter.ofPattern("yyyy")
@@ -287,6 +297,15 @@ private fun DrawScope.drawGraph(
             strokeWidth = 1.dp.toPx(),
             cap = StrokeCap.Round,
         )
+    }
+
+    // A day with no day just before or after it (like the very first weight) has no
+    // segment to draw: show it as a small dot instead, so it doesn't stay invisible.
+    val greyDates = grey.map { it.date }.toSet()
+    for (point in grey) {
+        if (point.date.minusDays(1) !in greyDates && point.date.plusDays(1) !in greyDates) {
+            drawCircle(DailyLine, radius = 2.5.dp.toPx(), center = Offset(x(point.date), y(point.weightKg)))
+        }
     }
 
     // Smoothed curve on top: thicker, each segment coloured by its trend.

@@ -49,6 +49,7 @@
     <string name="average">Snitt</string>
     <string name="last_30_days">Siste 30 dager: %1$s</string>
     <string name="no_data_period">Ingen data i denne perioden</string>
+    <string name="no_data_yet">Ingen vekt ennå. Trykk på %1$s for å legge inn dagens vekt, eller importer en CSV-backup fra ⋮-menyen.</string>
     <string name="period_1y">1Å</string>
     <string name="period_2y">2Å</string>
     <string name="period_5y">5Å</string>

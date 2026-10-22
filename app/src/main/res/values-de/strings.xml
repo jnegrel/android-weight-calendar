@@ -49,6 +49,7 @@
     <string name="average">Durchschnitt</string>
     <string name="last_30_days">Letzte 30 Tage: %1$s</string>
     <string name="no_data_period">Keine Daten in diesem Zeitraum</string>
+    <string name="no_data_yet">Noch kein Gewicht. Tippe auf %1$s, um das heutige Gewicht einzutragen, oder importiere eine CSV-Sicherung über das ⋮-Menü.</string>
     <string name="period_1y">1J</string>
     <string name="period_2y">2J</string>
     <string name="period_5y">5J</string>
